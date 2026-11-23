@@ -30,6 +30,8 @@ always have the same version.
 - Shell glue for bash, zsh, fish: Enter hook rewrites a slash phrase into
   `real command  #slash: phrase`; the shell runs and records it natively.
   Confirm-before-run when slash had to choose; fail open on any error.
+  Layer 2 fallback functions per verb for compound lines and setups without
+  a usable Enter hook: print `→ real command`, run, append to history.
 - Installer/uninstaller (per user, one guarded block in the rc file): record
   existing collisions, report them, "newest install wins" at rewrite time.
   Uninstall restores everything exactly (CI-tested: rc file byte-identical,

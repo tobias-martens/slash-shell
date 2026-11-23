@@ -101,12 +101,12 @@ under the same goals.
   `search` (Go dev packages), `show` (nmh), `pack` (allegro dev tools),
   `start`/`stop`/`restart` (some Alpine package, unverified). Never usable:
   `old` (openSUSE base package `aaa_base`).
-- Mechanism: **line rewriting on Enter** (decided 2026-11-23). When the
+- Mechanism: two layers (decided 2026-11-23). Layer 1 — **line rewriting on
+  Enter** (main path). When the
   user presses Enter and the whole line is a slash phrase, the shell hook
   replaces the line with the real command plus a comment, e.g.
   `sudo apt update && sudo apt upgrade  #slash: update`, and the shell runs
-  and records it natively — no history manipulation, no separate "→" output,
-  no shell functions or aliases defined at all.
+  and records it natively — no history manipulation, no separate "→" output.
   - fish: `abbr --function` (fish ≥ 3.6). zsh: wrapper widget around
     `accept-line`. bash (≥ 4): Enter bound to "rewrite line, then
     accept-line" (emacs and vi keymaps; ble.sh needs its own hook).
@@ -117,14 +117,24 @@ under the same goals.
   - Verbs with own output or follow-ups (`search`, `about`, `stop <program>`)
     rewrite to `slash <verb> …  #slash: …`; slash then prints the real
     commands it runs.
-  - Only whole lines are rewritten; `update && reboot` is left alone.
+  - Only whole lines are rewritten; compound lines are handled by layer 2.
+  - Layer 2 — fallback functions: `init` also defines one shell function per
+    verb, used only when layer 1 didn't rewrite the line (compound lines like
+    `update && reboot`, bash without readline / ble.sh / Emacs shell, other
+    tools owning Enter). The function asks the same resolver (same takeover
+    rules, coreutils `install` rule, fail open), prints `→ real command`,
+    runs it, and appends `real command  #slash: phrase` to history
+    (bash `history -s`, zsh `print -s`; fish: no reliable way, skipped).
+    Functions exist only in interactive sessions: scripts are untouched,
+    `command <name>` bypasses them, uninstall stays clean.
+  - ble.sh: own hook later, so it gets layer 1 too.
   - Fail open: if the slash binary is missing, errors or is slow, the line is
     accepted unchanged. A broken slash must never block the user's Enter key.
-- Takeover policy, "newest install wins" (all decided at rewrite time; slash
-  never modifies, wraps or shadows any binary):
-  - Names that already exist when slash is installed: slash rewrites them;
-    `command <name> …` runs the original (first word isn't a verb, so it's
-    never rewritten). Recorded in a state file, reported once at install.
+- Takeover policy, "newest install wins" (same rules in both layers; slash
+  never modifies or replaces any installed program):
+  - Names that already exist when slash is installed: slash takes them over;
+    `command <name> …` runs the original (never rewritten, and it bypasses
+    the layer-2 functions). Recorded in a state file, reported once at install.
   - Commands installed *after* slash win: if a real command with the verb's
     name exists that isn't in the recorded list, the line is left alone and a
     one-time notice says slash's verb is now reachable as `slash <verb>`. If
@@ -182,7 +192,8 @@ under the same goals.
   installed command, confirm with `[Y/n]` (Enter = yes), never non-interactive.
   Chains to the distro's existing command-not-found handler.
 - Architecture: one static Go binary `slash`. The resolver (`slash resolve …`)
-  only prints the command. The shell glue (Enter hook, completion) is
+  only prints the command. The shell glue (Enter hook, fallback functions,
+  completion) is
   embedded in the binary and loaded the zoxide/starship way:
   `eval "$(slash init bash)"` (also `zsh`, `fish`) in the rc file. Command
   mappings are data files (embedded at build time), not code.
