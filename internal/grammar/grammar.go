@@ -64,8 +64,14 @@ func SourceOf(word string) string { return sourceWords[strings.ToLower(word)] }
 
 // ParseLine parses a full command line as typed. Lines with shell syntax
 // (pipes, quotes, variables, redirections, …) are never slash phrases.
+// Exception: search takes * and ? (search *.mp4), so they reach slash
+// instead of being expanded by the shell.
 func ParseLine(line string) (Phrase, error) {
-	if strings.ContainsAny(line, "|&;<>()$`\"'\\*?[]{}!#=\n") {
+	special := "|&;<>()$`\"'\\*?[]{}!#=\n"
+	if f := strings.Fields(line); len(f) > 0 && f[0] == "search" {
+		special = strings.NewReplacer("*", "", "?", "").Replace(special)
+	}
+	if strings.ContainsAny(line, special) {
 		return Phrase{}, ErrNotAPhrase
 	}
 	return Parse(strings.Fields(line))
@@ -106,9 +112,12 @@ func Parse(words []string) (Phrase, error) {
 	}
 	if verb == Search {
 		// All words are looked for together; "and" and commas are just words.
+		// Wildcards split a word: "*.mp4" looks for ".mp4", "a*b" for a and b.
 		for _, w := range rest {
-			if w != "," {
-				p.Things = append(p.Things, w)
+			for _, part := range strings.FieldsFunc(w, func(r rune) bool { return r == '*' || r == '?' }) {
+				if part != "," {
+					p.Things = append(p.Things, part)
+				}
 			}
 		}
 		if len(p.Things) == 0 {

@@ -57,7 +57,7 @@ const maxFileLines = 20000
 
 // Find returns the best limit paths whose name contains every word
 // (case-insensitive), the total number found, and the command it ran.
-// Hidden files and folders are skipped unless a word starts with ".".
+// Hidden folders are skipped; see filterRank.
 func (f Files) Find(words []string, limit int) (top []string, total int, how string) {
 	var found []string
 	for _, tool := range []string{"plocate", "locate"} {
@@ -86,27 +86,38 @@ func (f Files) Find(words []string, limit int) (top []string, total int, how str
 
 func (f Files) findArgs(words []string) []string {
 	args := []string{f.Home, "-xdev"}
-	if !wantsHidden(words) {
-		args = append(args, "-name", ".*", "-prune", "-o")
-	}
+	match := []string{}
 	for _, w := range words {
-		args = append(args, "-iname", "*"+globEscape(w)+"*")
+		match = append(match, "-iname", "*"+globEscape(w)+"*")
 	}
+	if dots := dotWords(words); len(dots) > 0 {
+		// Hidden entries are listed only if their own name starts with a
+		// word like ".bashrc"; hidden folders are never searched.
+		args = append(args, "(", "-name", ".*")
+		args = append(args, match...)
+		args = append(args, "-iname", globEscape(dots[0])+"*", "-print", ")", "-o")
+	}
+	args = append(args, "-name", ".*", "-prune", "-o")
+	args = append(args, match...)
 	return append(args, "-print")
 }
 
-// filterRank keeps paths whose base name contains every word, visible ones
-// only (unless asked for), files in the home directory first, then by depth.
+// filterRank keeps paths whose base name contains every word, files in the
+// home directory first, then by depth. Nothing inside hidden folders; a
+// hidden file only if its name starts with a word like ".bashrc".
 func (f Files) filterRank(paths []string, words []string) []string {
-	hidden := wantsHidden(words)
+	dots := dotWords(words)
 	var out []string
 	for _, p := range paths {
 		base := strings.ToLower(filepath.Base(p))
-		ok := true
+		ok := !strings.Contains(filepath.Dir(p), "/.")
 		for _, w := range words {
 			ok = ok && strings.Contains(base, strings.ToLower(w))
 		}
-		if ok && (hidden || !strings.Contains(p, "/.")) {
+		if ok && strings.HasPrefix(base, ".") {
+			ok = slices.ContainsFunc(dots, func(d string) bool { return strings.HasPrefix(base, strings.ToLower(d)) })
+		}
+		if ok {
 			out = append(out, p)
 		}
 	}
@@ -128,13 +139,15 @@ func (f Files) filterRank(paths []string, words []string) []string {
 	return out
 }
 
-func wantsHidden(words []string) bool {
+// dotWords returns the words that start with "." (".bashrc", ".mp4").
+func dotWords(words []string) []string {
+	var out []string
 	for _, w := range words {
 		if strings.HasPrefix(w, ".") {
-			return true
+			out = append(out, w)
 		}
 	}
-	return false
+	return out
 }
 
 var globSpecial = strings.NewReplacer(`\`, `\\`, `*`, `\*`, `?`, `\?`, `[`, `\[`)

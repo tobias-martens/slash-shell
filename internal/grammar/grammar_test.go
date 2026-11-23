@@ -37,6 +37,8 @@ func TestParseLine(t *testing.T) {
 		{"search editor in packages", Search, []string{"editor"}, "packages", "search editor in packages"},
 		{"search editor in apps", Search, []string{"editor"}, "packages", "search editor in apps"},
 		{"search editor in flatpak", Search, []string{"editor"}, "flatpak", "search editor in flatpak"},
+		{"search *.mp4", Search, []string{".mp4"}, "", "search *.mp4"},
+		{"search holiday*2024 in files", Search, []string{"holiday", "2024"}, "files", "search holiday*2024 in files"},
 		{"search files", Search, []string{"files"}, "", "search files"},
 		{"about vlc", About, []string{"vlc"}, "", "about vlc"},
 		{"describe vlc and gimp", About, []string{"vlc", "gimp"}, "", "describe vlc and gimp"},

@@ -49,8 +49,11 @@ under the same goals.
     Searching file *contents* is a later addition.
     Built (stage 2): package names must contain every word; ranked exact
     name, whole word part, prefix, rest. Shows 5 per section (30 when
-    narrowed with `in …`) and "… N more: search X in <section>". Hidden
-    files are skipped unless a word starts with ".". Flatpak results show
+    narrowed with `in …`) and "… N more: search X in <section>". `*`/`?`
+    split words (`search *.mp4` = names containing ".mp4"); layer 1 lets
+    them through for search only, so the shell doesn't expand them. Hidden
+    folders are never searched; a hidden file shows only if its name starts
+    with a word like ".bashrc". Flatpak results show
     the app ID (what `install` takes) plus display name. Sources without
     local data say "run: update". Verified 2026-11-24 with strace: no
     AF_INET/AF_INET6 connection from `search` or `about` (only local

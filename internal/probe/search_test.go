@@ -126,6 +126,13 @@ func TestFilesRanking(t *testing.T) {
 	if got := f.filterRank(in, []string{".cache"}); len(got) != 0 {
 		t.Errorf("only base names count: %v", got)
 	}
+	dots := []string{"/home/u/.bashrc", "/home/u/.foo.mp4", "/home/u/v.mp4", "/home/u/.local/x.mp4", "/home/u/.mp4rc"}
+	if got := f.filterRank(dots, []string{".mp4"}); !reflect.DeepEqual(got, []string{"/home/u/.mp4rc", "/home/u/v.mp4"}) {
+		t.Errorf(".mp4: got %v", got)
+	}
+	if got := f.filterRank(dots, []string{".bashrc"}); !reflect.DeepEqual(got, []string{"/home/u/.bashrc"}) {
+		t.Errorf(".bashrc: got %v", got)
+	}
 	args := strings.Join(f.findArgs([]string{"a*b"}), " ")
 	if args != `/home/u -xdev -name .* -prune -o -iname *a\*b* -print` {
 		t.Errorf("find args: %s", args)
