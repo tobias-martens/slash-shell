@@ -1,0 +1,17 @@
+slash
+update
+upgrade
+install
+remove
+uninstall
+about
+describe
+search
+show
+start
+stop
+restart
+unpack
+pack
+delete
+clean

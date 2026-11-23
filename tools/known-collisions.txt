@@ -1,0 +1,7 @@
+install
+pack
+restart
+search
+show
+start
+stop

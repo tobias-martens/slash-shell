@@ -1,0 +1,19 @@
+# Weekly: fail if a distro starts shipping a command named like a slash verb.
+# Known, accepted collisions are listed in tools/known-collisions.txt.
+name: name-collisions
+on:
+  schedule: [{cron: "0 6 * * 1"}]
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y zstd
+      - name: check reserved names against distro file indexes
+        run: |
+          tools/check-names.sh "$RUNNER_TEMP/idx" $(cat tools/reserved-names.txt) | tee report.txt
+          awk '{print $1}' report.txt | sort -u > found.txt
+          if new=$(comm -23 found.txt <(sort -u tools/known-collisions.txt)) && [ -n "$new" ]; then
+            echo "::error::new name collisions: $new"; exit 1
+          fi
