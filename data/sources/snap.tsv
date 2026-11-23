@@ -1,0 +1,4 @@
+# key	template   ({sudo} = "sudo " unless root, {pkgs} = quoted package names)
+update	{sudo}snap refresh
+install	{sudo}snap install {pkgs}
+remove	{sudo}snap remove {pkgs}

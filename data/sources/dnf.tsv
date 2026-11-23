@@ -1,0 +1,4 @@
+# key	template   ({sudo} = "sudo " unless root, {pkgs} = quoted package names)
+update	{sudo}dnf upgrade
+install	{sudo}dnf install {pkgs}
+remove	{sudo}dnf remove {pkgs}

@@ -1,0 +1,5 @@
+# key	template   ({sudo} = "sudo " unless root, {pkgs} = quoted package names)
+# never sudo: system-wide changes go through polkit
+update	flatpak update
+install	flatpak install {pkgs}
+remove	flatpak uninstall {pkgs}

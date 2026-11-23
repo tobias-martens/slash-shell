@@ -1,0 +1,6 @@
+# key	template   ({sudo} = "sudo " unless root, {pkgs} = quoted package names)
+# Tumbleweed is a rolling release and must use dist-upgrade
+update	{sudo}zypper update
+update@opensuse-tumbleweed	{sudo}zypper dist-upgrade
+install	{sudo}zypper install {pkgs}
+remove	{sudo}zypper remove {pkgs}

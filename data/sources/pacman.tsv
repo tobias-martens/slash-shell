@@ -1,0 +1,5 @@
+# key	template   ({sudo} = "sudo " unless root, {pkgs} = quoted package names)
+# never -Sy without -u: partial upgrades break Arch systems
+update	{sudo}pacman -Syu
+install	{sudo}pacman -S {pkgs}
+remove	{sudo}pacman -R {pkgs}

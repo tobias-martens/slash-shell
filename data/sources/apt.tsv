@@ -1,0 +1,4 @@
+# key	template   ({sudo} = "sudo " unless root, {pkgs} = quoted package names)
+update	{sudo}apt update && {sudo}apt upgrade
+install	{sudo}apt install {pkgs}
+remove	{sudo}apt remove {pkgs}

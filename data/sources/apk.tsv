@@ -1,0 +1,4 @@
+# key	template   ({sudo} = "sudo " unless root, {pkgs} = quoted package names)
+update	{sudo}apk update && {sudo}apk upgrade
+install	{sudo}apk add {pkgs}
+remove	{sudo}apk del {pkgs}
