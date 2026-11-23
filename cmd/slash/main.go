@@ -17,6 +17,7 @@ import (
 	"github.com/tobias-martens/slash-shell/internal/resolve"
 	"github.com/tobias-martens/slash-shell/internal/sources"
 	"github.com/tobias-martens/slash-shell/internal/takeover"
+	"github.com/tobias-martens/slash-shell/shell"
 )
 
 // version is set at build time: -ldflags "-X main.version=1.2.3".
@@ -69,6 +70,18 @@ func (a *app) run(args []string) int {
 		return 0
 	case "resolve":
 		return a.resolveCmd(args[1:])
+	case "init":
+		if len(args) != 2 {
+			fmt.Fprintf(a.stderr, "usage: slash init %s\n", strings.Join(shell.Supported, "|"))
+			return exitUserError
+		}
+		script, err := shell.Script(args[1], takeover.Candidates(grammar.Verbs))
+		if err != nil {
+			fmt.Fprintf(a.stderr, "slash: %v\n", err)
+			return exitUserError
+		}
+		fmt.Fprint(a.stdout, script)
+		return 0
 	}
 	if _, ok := grammar.Verbs[args[0]]; ok {
 		return a.direct(args)
@@ -80,15 +93,21 @@ func (a *app) run(args []string) int {
 // resolveCmd implements
 //
 //	slash resolve --line LINE      (Enter hook: silent, whole typed line)
-//	slash resolve --words VERB …   (fallback functions: explains problems)
+//	slash resolve --words [--history ENTRY] VERB …
+//	                               (fallback functions: explains problems;
+//	                                prints a rewritten history entry as a
+//	                                second line when ENTRY contains the phrase)
 func (a *app) resolveCmd(args []string) int {
 	if len(args) == 2 && args[0] == "--line" {
 		return a.resolveLine(args[1])
 	}
-	if len(args) >= 2 && args[0] == "--words" {
-		return a.resolveWords(args[1:])
+	if len(args) >= 4 && args[0] == "--words" && args[1] == "--history" {
+		return a.resolveWords(args[3:], args[2])
 	}
-	fmt.Fprintln(a.stderr, "usage: slash resolve --line LINE | --words VERB [WORD…]")
+	if len(args) >= 2 && args[0] == "--words" {
+		return a.resolveWords(args[1:], "")
+	}
+	fmt.Fprintln(a.stderr, "usage: slash resolve --line LINE | --words [--history ENTRY] VERB [WORD…]")
 	return exitUserError
 }
 
@@ -112,7 +131,7 @@ func (a *app) resolveLine(line string) int {
 	return exitRun
 }
 
-func (a *app) resolveWords(words []string) int {
+func (a *app) resolveWords(words []string, history string) int {
 	d := a.decider().Decide(words[0], words[1:])
 	if !d.Handle {
 		if d.Newer != "" && a.state.NotifyOnce(words[0]) {
@@ -126,6 +145,11 @@ func (a *app) resolveWords(words []string) int {
 		return code
 	}
 	fmt.Fprintln(a.stdout, res.Line())
+	if history != "" {
+		if entry := res.HistoryEntry(history); entry != "" {
+			fmt.Fprintln(a.stdout, entry)
+		}
+	}
 	if res.Confirm {
 		return exitConfirm
 	}

@@ -127,3 +127,13 @@ func TestDirect(t *testing.T) {
 		t.Errorf("declined but ran %q", *ran)
 	}
 }
+
+func TestResolveWordsHistory(t *testing.T) {
+	a, out, _, _ := newTestApp(t)
+	code := a.run([]string{"resolve", "--words", "--history", "update && reboot", "update"})
+	want := "sudo apt update && sudo apt upgrade; flatpak update  #slash: update\n" +
+		"{ sudo apt update && sudo apt upgrade; flatpak update; } && reboot  #slash: update\n"
+	if code != exitRun || out.String() != want {
+		t.Errorf("code %d, out %q", code, out.String())
+	}
+}

@@ -31,12 +31,70 @@ type Result struct {
 }
 
 // Line is what goes onto the command line and into history.
-func (r Result) Line() string {
-	comment := "#slash: " + r.Phrase.Text
+func (r Result) Line() string { return r.Command + "  " + r.comment() }
+
+func (r Result) comment() string {
+	c := "#slash: " + r.Phrase.Text
 	if r.Reason != "" {
-		comment += " (" + r.Reason + ")"
+		c += " (" + r.Reason + ")"
 	}
-	return r.Command + "  " + comment
+	return c
+}
+
+// HistoryEntry rewrites a history entry that contains the phrase, so history
+// keeps a real, replayable command line:
+//
+//	update && reboot  →  { sudo apt update && sudo apt upgrade; } && reboot  #slash: update
+//
+// It returns "" (leave history alone) unless the phrase occurs exactly once
+// as a whole command in a single-line entry.
+func (r Result) HistoryEntry(entry string) string {
+	phrase := r.Phrase.Text
+	if strings.TrimSpace(entry) == phrase {
+		return r.Line()
+	}
+	if strings.Contains(entry, "\n") {
+		return ""
+	}
+	at := -1
+	for i := 0; i+len(phrase) <= len(entry); i++ {
+		if entry[i:i+len(phrase)] != phrase {
+			continue
+		}
+		if !startsCommand(entry, i) || !endsCommand(entry, i+len(phrase)) {
+			continue
+		}
+		if at >= 0 {
+			return "" // more than once: ambiguous
+		}
+		at = i
+	}
+	if at < 0 {
+		return ""
+	}
+	cmd := r.Command
+	if strings.ContainsAny(cmd, ";&|") {
+		cmd = "{ " + cmd + "; }" // keep the meaning inside a larger line
+	}
+	return entry[:at] + cmd + entry[at+len(phrase):] + "  " + r.comment()
+}
+
+// startsCommand reports whether position i in s is where a command starts:
+// the line start, or after ; & | ( with optional blanks in between.
+func startsCommand(s string, i int) bool {
+	for i > 0 && (s[i-1] == ' ' || s[i-1] == '\t') {
+		i--
+	}
+	return i == 0 || strings.IndexByte(";&|(", s[i-1]) >= 0
+}
+
+// endsCommand reports whether a command ends at position i in s: the line
+// end, or ; & | ) # with optional blanks in between.
+func endsCommand(s string, i int) bool {
+	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+		i++
+	}
+	return i == len(s) || strings.IndexByte(";&|)#", s[i]) >= 0
 }
 
 // Resolver resolves phrases for one system.

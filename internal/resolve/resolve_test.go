@@ -132,3 +132,34 @@ func TestQuote(t *testing.T) {
 }
 
 func contains(s, sub string) bool { return strings.Contains(s, sub) }
+
+func TestHistoryEntry(t *testing.T) {
+	update, _ := grammar.ParseLine("update")
+	multi := Result{Command: "sudo apt update && sudo apt upgrade; flatpak update", Phrase: update}
+	vlc, _ := grammar.ParseLine("install vlc")
+	single := Result{Command: "sudo apt install vlc", Phrase: vlc}
+	tests := []struct {
+		r     Result
+		entry string
+		want  string
+	}{
+		{multi, "update", "sudo apt update && sudo apt upgrade; flatpak update  #slash: update"},
+		{multi, "update && reboot", "{ sudo apt update && sudo apt upgrade; flatpak update; } && reboot  #slash: update"},
+		{multi, "echo start; update", "echo start; { sudo apt update && sudo apt upgrade; flatpak update; }  #slash: update"},
+		{single, "install vlc && vlc", "sudo apt install vlc && vlc  #slash: install vlc"},
+		{single, "(install vlc)", "(sudo apt install vlc)  #slash: install vlc"},
+		{multi, "update; update", ""},       // twice: ambiguous
+		{multi, "echo update-notifier", ""}, // not a whole command
+		{multi, "myupdate && x", ""},        // not a whole command
+		{multi, "echo update", ""},          // an argument, not a command
+		{multi, "sudo update", ""},          // an argument, not a command
+		{multi, "true &&  update  # done", "true &&  { sudo apt update && sudo apt upgrade; flatpak update; }  # done  #slash: update"},
+		{single, "install  vlc && x", ""},           // typed differently
+		{multi, "for i in 1; do\nupdate\ndone", ""}, // multi-line
+	}
+	for _, tt := range tests {
+		if got := tt.r.HistoryEntry(tt.entry); got != tt.want {
+			t.Errorf("%q:\n got %q\nwant %q", tt.entry, got, tt.want)
+		}
+	}
+}
