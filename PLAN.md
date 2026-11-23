@@ -20,7 +20,7 @@ always have the same version.
   dry-run mode, **networking disabled** for search/about tests.
 - `tools/check-names.sh` in CI to catch new name collisions.
 
-## Stage 1 — core + packages
+## Stage 1 — core + packages (done 2026-11-24)
 - Source detection: apt, dnf, pacman, zypper, apk, flatpak, snap; immutable
   systems (SteamOS, Fedora Atomic) → flatpak first.
 - Grammar: `<verb> <things> [as|from|via|in <source>]`, `and`, commas, `only`.
@@ -37,6 +37,9 @@ always have the same version.
   Uninstall restores everything exactly (CI-tested: rc file byte-identical,
   taken-over commands work as before).
 - `slash` intro screen; `slash doctor`; `slash resolve` (dry run).
+- Status: all of the above built; Go unit tests plus 46 pty tests (bash,
+  zsh, fish, end to end) pass on Ubuntu. dnf/pacman/zypper/apk commands are
+  unit-tested only until the distro container tests (stage 5).
 
 ## Stage 2 — search and about (offline only)
 - `search`: files (`plocate`/`locate`, else `find` in home) + packages from

@@ -80,6 +80,8 @@ func (a *app) run(args []string) int {
 		return a.enable(args[1:])
 	case "disable":
 		return a.disable()
+	case "doctor":
+		return a.doctor()
 	case "init":
 		if len(args) != 2 {
 			fmt.Fprintf(a.stderr, "usage: slash init %s\n", strings.Join(shell.Supported, "|"))

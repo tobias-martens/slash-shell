@@ -172,3 +172,28 @@ func TestEnableDisable(t *testing.T) {
 		t.Error("state dir should be gone")
 	}
 }
+
+func TestDoctor(t *testing.T) {
+	a, out, _, _ := newTestApp(t, "update")
+	a.run([]string{"enable", "bash"})
+	out.Reset()
+	if a.state.Record(nil) != nil { // "update" appeared after slash was enabled
+		t.Fatal("record")
+	}
+	if a.run([]string{"doctor"}) != 0 {
+		t.Fatal("doctor failed")
+	}
+	for _, want := range []string{
+		"Sources:   apt (system), flatpak",
+		"Installs:  from apt first",
+		"bash  enabled in ~/.bashrc",
+		"zsh   not enabled (turn on with: slash enable zsh)",
+		"install   slash's; /usr/bin/install still handles files",
+		"update    /usr/bin/update was installed after slash and wins; slash's: slash update …",
+		"remove, uninstall, upgrade: slash's, no other program uses them",
+	} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("missing %q in:\n%s", want, out.String())
+		}
+	}
+}

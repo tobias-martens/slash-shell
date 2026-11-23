@@ -187,3 +187,13 @@ func missingDirs(dir string) []string {
 		dir = parent
 	}
 }
+
+// Paths lists the files slash's block was added to.
+func (s Store) Paths() []string {
+	recs, _ := s.load()
+	var out []string
+	for _, r := range recs {
+		out = append(out, r.Path)
+	}
+	return out
+}
