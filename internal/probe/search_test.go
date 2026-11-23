@@ -8,7 +8,7 @@ import (
 
 // Sample outputs in each tool's format (LC_ALL=C).
 var searchOutputs = map[string]string{
-	"apt-cache": "gnome-text-editor - simple text editor for GNOME\neditorconfig - coding style indenter\n",
+	"apt-cache":  "gnome-text-editor - simple text editor for GNOME\neditorconfig - coding style indenter\n",
 	"dpkg-query": "gnome-text-editor\tii \neditorconfig\tun \n",
 	"dnf": "===== Name Matched: editor =====\n" +
 		"gnome-text-editor.x86_64 : Simple text editor\n" +
@@ -89,13 +89,13 @@ func TestRanking(t *testing.T) {
 
 func TestAboutParsers(t *testing.T) {
 	outputs := map[string]string{
-		"apt-cache": "Package: vlc\nVersion: 3.0.23-1\nHomepage: https://www.videolan.org/vlc/\nDescription-en: multimedia player\n more text\n\nPackage: vlc\nVersion: 3.0.20-1\n",
+		"apt-cache":  "Package: vlc\nVersion: 3.0.23-1\nHomepage: https://www.videolan.org/vlc/\nDescription-en: multimedia player\n more text\n\nPackage: vlc\nVersion: 3.0.20-1\n",
 		"dpkg-query": "ii \t3.0.23-1",
-		"dnf": "Available Packages\nName         : vlc\nVersion      : 3.0.23\nRelease      : 1.fc43\nSummary      : multimedia player\nURL          : https://www.videolan.org/vlc/\n",
-		"rpm":    "3.0.23-1.fc43",
-		"pacman": "Repository      : extra\nName            : vlc\nVersion         : 3.0.23-1\nDescription     : multimedia player\nURL             : https://www.videolan.org/vlc/\n",
-		"zypper": "Information for package vlc:\n----------------------------\nRepository     : Main\nName           : vlc\nVersion        : 3.0.23-1.1\nSummary        : multimedia player\n",
-		"apk":    "vlc-3.0.23-r0 - multimedia player\nvlc-dev-3.0.23-r0 - development files\n",
+		"dnf":        "Available Packages\nName         : vlc\nVersion      : 3.0.23\nRelease      : 1.fc43\nSummary      : multimedia player\nURL          : https://www.videolan.org/vlc/\n",
+		"rpm":        "3.0.23-1.fc43",
+		"pacman":     "Repository      : extra\nName            : vlc\nVersion         : 3.0.23-1\nDescription     : multimedia player\nURL             : https://www.videolan.org/vlc/\n",
+		"zypper":     "Information for package vlc:\n----------------------------\nRepository     : Main\nName           : vlc\nVersion        : 3.0.23-1.1\nSummary        : multimedia player\n",
+		"apk":        "vlc-3.0.23-r0 - multimedia player\nvlc-dev-3.0.23-r0 - development files\n",
 	}
 	for _, src := range []string{"apt", "dnf", "pacman", "zypper", "apk"} {
 		p := &Probe{Run: func(name string, args ...string) (string, bool) {
