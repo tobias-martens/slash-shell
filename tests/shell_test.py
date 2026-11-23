@@ -225,5 +225,79 @@ class BashTest(unittest.TestCase):
         self.sh.expect("NOT-IN-SCRIPT\n")
 
 
+FAKE_TOOL = """#!/bin/sh
+echo "FAKE-$(basename "$0") $*"
+"""
+
+
+@unittest.skipUnless(SLASH_BIN and shutil.which("bash") and shutil.which("apt-cache"), "needs SLASH_BIN, bash, apt")
+class EndToEndBash(unittest.TestCase):
+    """The real slash: enable, use, disable. sudo/flatpak/snap are fakes that
+    only print, so nothing is ever installed."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.bindir = os.path.join(self.tmp, "bin")
+        os.mkdir(self.bindir)
+        shutil.copy(SLASH_BIN, os.path.join(self.bindir, "slash"))
+        for tool in ["sudo", "flatpak", "snap"]:
+            path = os.path.join(self.bindir, tool)
+            with open(path, "w") as f:
+                f.write(FAKE_TOOL)
+            os.chmod(path, 0o755)
+        self.rc = os.path.join(self.tmp, ".bashrc")
+        self.original = "PS1='PROMPT> '\nHISTFILE=%s/hist\n" % self.tmp
+        with open(self.rc, "w") as f:
+            f.write(self.original)
+        self.env = {"HOME": self.tmp, "PATH": self.bindir + ":/usr/bin:/bin", "TERM": "xterm",
+                    "LC_ALL": "C.UTF-8", "SHELL": "/bin/bash", "XDG_STATE_HOME": self.tmp + "/state",
+                    "XDG_CACHE_HOME": self.tmp + "/cache"}
+
+    def tearDown(self):
+        if hasattr(self, "sh"):
+            self.sh.close()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def slash(self, *args):
+        return subprocess.run([os.path.join(self.bindir, "slash"), *args], env=self.env,
+                              capture_output=True, text=True)
+
+    def shell(self):
+        self.sh = Shell(["bash", "--noprofile", "-i"], self.env)
+        self.sh.expect("PROMPT> ")
+        self.sh.mark()
+
+    def test_enable_use_disable(self):
+        r = self.slash("enable")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("enabled for bash", r.stdout)
+
+        self.shell()
+        self.sh.send("update\r")
+        self.sh.expect("FAKE-sudo apt update")
+        self.sh.expect("FAKE-flatpak update")
+        self.sh.expect("FAKE-sudo snap refresh")
+        self.sh.mark()
+        self.sh.send("history 3\r")
+        self.sh.expect(r"sudo apt update && sudo apt upgrade; flatpak update; sudo snap refresh  #slash: update")
+        self.sh.mark()
+        self.sh.send("install -m 644 %s %s/copy\r" % (self.rc, self.tmp))  # coreutils install, untouched
+        self.sh.expect("PROMPT> ")
+        self.assertTrue(os.path.exists(os.path.join(self.tmp, "copy")))
+        self.sh.close()
+        del self.sh
+
+        r = self.slash("disable")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(self.rc) as f:
+            self.assertEqual(f.read(), self.original, "rc file must be byte-identical")
+        self.assertFalse(os.path.exists(self.tmp + "/state/slash"))
+
+        self.shell()
+        self.sh.send("update\r")
+        self.sh.expect(r"(?i)not found")
+        self.assertNotIn("FAKE-", self.sh.text())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

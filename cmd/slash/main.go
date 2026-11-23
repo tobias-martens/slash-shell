@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/tobias-martens/slash-shell/data"
@@ -15,6 +16,7 @@ import (
 	"github.com/tobias-martens/slash-shell/internal/intro"
 	"github.com/tobias-martens/slash-shell/internal/probe"
 	"github.com/tobias-martens/slash-shell/internal/resolve"
+	"github.com/tobias-martens/slash-shell/internal/setup"
 	"github.com/tobias-martens/slash-shell/internal/sources"
 	"github.com/tobias-martens/slash-shell/internal/takeover"
 	"github.com/tobias-martens/slash-shell/shell"
@@ -38,6 +40,8 @@ type app struct {
 	probe          resolve.Probe
 	state          takeover.State
 	root           bool
+	home           string
+	getenv         func(string) string
 	confirm        func(question string) bool // asks the user (on the terminal)
 	execute        func(command string) int   // runs a command line
 }
@@ -50,6 +54,8 @@ func main() {
 		probe:   probe.New(),
 		state:   takeover.DefaultState(),
 		root:    os.Geteuid() == 0,
+		home:    homeDir(),
+		getenv:  os.Getenv,
 		confirm: askTTY,
 		execute: runShell,
 	}
@@ -70,6 +76,10 @@ func (a *app) run(args []string) int {
 		return 0
 	case "resolve":
 		return a.resolveCmd(args[1:])
+	case "enable":
+		return a.enable(args[1:])
+	case "disable":
+		return a.disable()
 	case "init":
 		if len(args) != 2 {
 			fmt.Fprintf(a.stderr, "usage: slash init %s\n", strings.Join(shell.Supported, "|"))
@@ -227,4 +237,92 @@ func runShell(command string) int {
 		return 127
 	}
 	return 0
+}
+
+func homeDir() string {
+	h, _ := os.UserHomeDir()
+	return h
+}
+
+// enable hooks slash into the given shells (default: the login shell) and
+// records which verb names already exist, so slash takes those over.
+func (a *app) enable(shells []string) int {
+	if len(shells) == 0 {
+		sh := filepath.Base(a.getenv("SHELL"))
+		if sh == "" || sh == "." {
+			fmt.Fprintln(a.stderr, "slash: which shell? For example: slash enable bash")
+			return exitUserError
+		}
+		shells = []string{sh}
+	}
+	store := setup.Store{Dir: a.state.Dir}
+	for _, sh := range shells {
+		t, err := setup.TargetFor(sh, a.home, a.getenv)
+		if err != nil {
+			fmt.Fprintf(a.stderr, "slash: %v\n", err)
+			return exitUserError
+		}
+		changed, err := store.Enable(t)
+		if err != nil {
+			fmt.Fprintf(a.stderr, "slash: %v\n", err)
+			return 1
+		}
+		if changed {
+			fmt.Fprintf(a.stdout, "slash is now enabled for %s (added to %s).\n", sh, tildePath(t.Path, a.home))
+		} else {
+			fmt.Fprintf(a.stdout, "slash was already enabled for %s.\n", sh)
+		}
+	}
+
+	var taken []string
+	for _, name := range takeover.Candidates(grammar.Verbs) {
+		if _, err := a.env.LookPath(name); err == nil {
+			taken = append(taken, name)
+		}
+	}
+	if err := a.state.Record(taken); err != nil {
+		fmt.Fprintf(a.stderr, "slash: %v\n", err)
+		return 1
+	}
+	if len(taken) > 0 {
+		fmt.Fprintln(a.stdout, "\nThese names already exist on this system; slash takes them over:")
+		for _, name := range taken {
+			path, _ := a.env.LookPath(name)
+			if name == "install" {
+				fmt.Fprintf(a.stdout, "  install  %s keeps working for files, e.g. install -m 755 script ~/bin/\n", path)
+				continue
+			}
+			fmt.Fprintf(a.stdout, "  %-8s %s, still available as: command %s\n", name, path, name)
+		}
+	}
+	fmt.Fprintln(a.stdout, "\nOpen a new terminal to start. Undo everything with: slash disable")
+	return 0
+}
+
+// disable undoes enable exactly and removes slash's state and cache.
+func (a *app) disable() int {
+	notes, err := setup.Store{Dir: a.state.Dir}.Disable()
+	for _, n := range notes {
+		fmt.Fprintf(a.stderr, "slash: note: %s\n", n)
+	}
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		fmt.Fprintf(a.stderr, "slash: %v\n", err)
+		return 1
+	}
+	os.RemoveAll(a.state.Dir)
+	if cache, err := os.UserCacheDir(); err == nil && a.home != "" && strings.HasPrefix(cache, a.home) {
+		os.RemoveAll(filepath.Join(cache, "slash"))
+	}
+	fmt.Fprintln(a.stdout, "slash is disabled: new terminals start without it, open ones keep working as before.")
+	if self, err := os.Executable(); err == nil {
+		fmt.Fprintf(a.stdout, "To remove the program itself: rm %s\n", tildePath(self, a.home))
+	}
+	return 0
+}
+
+func tildePath(p, home string) string {
+	if home != "" && strings.HasPrefix(p, home+"/") {
+		return "~" + p[len(home):]
+	}
+	return p
 }

@@ -140,6 +140,10 @@ under the same goals.
     one-time notice says slash's verb is now reachable as `slash <verb>`. If
     that program is removed again, the verb comes back by itself.
   - The user's own aliases/functions with a verb's name always win.
+  - bash history in layer 2: bash can't add an entry without replacing the
+    current one, so the current entry is rewritten into its real equivalent
+    (`update && reboot` → `{ sudo apt update && …; } && reboot  #slash:
+    update`), only if the phrase occurs in it exactly once as a command.
   - Reinstalling slash is again the newest intent: re-records and takes over.
   - Coreutils `install`: lines it could execute successfully (options, or an
     operand that is an existing file/path) are never rewritten.
@@ -147,8 +151,13 @@ under the same goals.
   - The installer only adds one marked block to the rc file(s), guarded so a
     missing binary is harmless:
     `command -v slash >/dev/null && eval "$(slash init bash)"`.
-  - The uninstaller removes exactly that block, the binary and slash's state
-    dir (`~/.local/state/slash`) — nothing else.
+  - `slash enable [shell…]` (default: login shell) adds the block (bash:
+    `~/.bashrc`, zsh: `${ZDOTDIR:-~}/.zshrc`, fish: its own file
+    `~/.config/fish/conf.d/slash.fish`) and records the exact inserted text.
+    `slash disable` removes exactly that text, slash's state dir
+    (`~/.local/state/slash`) and cache (`~/.cache/slash`) — nothing else —
+    and says how to delete the binary. The install script (stage 5) will
+    offer full removal including the binary.
   - Since slash never touches other programs, any command it took over works
     as before immediately; already-open shells keep working thanks to
     fail-open. History entries stay valid, as they are real commands.

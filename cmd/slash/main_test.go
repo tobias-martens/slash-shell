@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
@@ -25,8 +26,15 @@ func newTestApp(t *testing.T, bins ...string) (*app, *bytes.Buffer, *bytes.Buffe
 	}
 	a := &app{
 		stdout: &out, stderr: &errOut,
-		probe:   fakeProbe{"apt/vlc": "vlc", "flatpak/obsidian": "md.obsidian.Obsidian"},
-		state:   takeover.State{Dir: t.TempDir() + "/slash"},
+		probe: fakeProbe{"apt/vlc": "vlc", "flatpak/obsidian": "md.obsidian.Obsidian"},
+		state: takeover.State{Dir: t.TempDir() + "/slash"},
+		home:  t.TempDir(),
+		getenv: func(k string) string {
+			if k == "SHELL" {
+				return "/bin/bash"
+			}
+			return ""
+		},
 		confirm: func(string) bool { return true },
 		execute: func(c string) int { ran = append(ran, c); return 0 },
 	}
@@ -135,5 +143,32 @@ func TestResolveWordsHistory(t *testing.T) {
 		"{ sudo apt update && sudo apt upgrade; flatpak update; } && reboot  #slash: update\n"
 	if code != exitRun || out.String() != want {
 		t.Errorf("code %d, out %q", code, out.String())
+	}
+}
+
+func TestEnableDisable(t *testing.T) {
+	a, out, _, _ := newTestApp(t, "remove") // "remove" exists before slash
+	rc := a.home + "/.bashrc"
+	os.WriteFile(rc, []byte("alias ll='ls -l'\n"), 0o644)
+	if code := a.run([]string{"enable"}); code != 0 {
+		t.Fatalf("enable: %d", code)
+	}
+	for _, want := range []string{"enabled for bash", "~/.bashrc", "install  /usr/bin/install keeps working", "remove   /usr/bin/remove, still available as: command remove"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("missing %q in:\n%s", want, out.String())
+		}
+	}
+	// "remove" existed at enable time → taken over.
+	if code := a.run([]string{"resolve", "--line", "remove vlc"}); code != exitRun {
+		t.Errorf("remove should be taken over, code %d", code)
+	}
+	if code := a.run([]string{"disable"}); code != 0 {
+		t.Fatalf("disable: %d", code)
+	}
+	if data, _ := os.ReadFile(rc); string(data) != "alias ll='ls -l'\n" {
+		t.Errorf("rc not restored: %q", data)
+	}
+	if _, err := os.Stat(a.state.Dir); !os.IsNotExist(err) {
+		t.Error("state dir should be gone")
 	}
 }
