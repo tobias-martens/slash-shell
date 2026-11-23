@@ -41,11 +41,15 @@ always have the same version.
   zsh, fish, end to end) pass on Ubuntu. dnf/pacman/zypper/apk commands are
   unit-tested only until the distro container tests (stage 5).
 
-## Stage 2 — search and about (offline only)
+## Stage 2 — search and about (offline only) (done 2026-11-24)
 - `search`: files (`plocate`/`locate`, else `find` in home) + packages from
   local catalogs only; case-insensitive substring; `in files|packages|<source>`.
 - `about`: compact per-source summary from script-stable commands.
 - No local data → "run `update` first", never fetch.
+- Status: built and tested on Ubuntu (apt, flatpak, snap; find for files).
+  The dnf, pacman, zypper and apk parsers and plocate/locate are written
+  from their documented output formats, unverified until the distro
+  container tests (stage 5).
 
 ## Stage 3 — show, start, stop, restart
 - `show` with its fixed list of things; unknown thing → "I can show: …".

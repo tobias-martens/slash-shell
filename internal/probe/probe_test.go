@@ -26,6 +26,14 @@ const appstream = `<?xml version="1.0" encoding="UTF-8"?>
   <custom>x</custom></component><component type="desktop">
     <id>org.videolan.VLC</id>
     <name>VLC</name>
+    <summary>VLC media player &amp; more</summary>
+    <summary xml:lang="de">Medienspieler</summary>
+    <developer><name>VideoLAN</name></developer>
+    <url type="homepage">https://www.videolan.org/vlc/</url>
+    <releases>
+      <release timestamp="1789603200" type="stable" version="3.0.24"/>
+      <release timestamp="1689603200" type="stable" version="3.0.23"/>
+    </releases>
   </component>
   <component type="console-application">
     <id>io.github.cli.Tool</id>
@@ -61,7 +69,12 @@ func TestFlatpakFind(t *testing.T) {
 				t.Errorf("%s: Find(%q) = %q, %v; want %q", round, pkg, got, ok, want)
 			}
 		}
-		if idx, _ := filepath.Glob(filepath.Join(cacheDir, "flatpak-*.tsv")); len(idx) != 1 {
+		want := App{ID: "org.videolan.VLC", Name: "VLC", Summary: "VLC media player & more",
+			Homepage: "https://www.videolan.org/vlc/", Version: "3.0.24"}
+		if a, _ := c.Lookup("vlc"); a != want {
+			t.Errorf("%s: Lookup = %+v", round, a)
+		}
+		if idx, _ := filepath.Glob(filepath.Join(cacheDir, "flatpak*-*.tsv")); len(idx) != 1 {
 			t.Errorf("%s: want exactly one cached index, got %v", round, idx)
 		}
 	}

@@ -22,6 +22,7 @@ SLASH_BIN = os.environ.get("SLASH_BIN", "")
 
 FAKE_SLASH = r"""#!/bin/sh
 # Fake `slash resolve` with fixed answers.
+if [ "$1" = search ]; then shift; echo "FOUND-$*"; exit 0; fi
 [ "$1" = resolve ] || exit 9
 mode=$2; shift 2
 entry=""
@@ -34,6 +35,10 @@ case "$line" in
     [ "$mode" = --words ] && [ "$entry" = "update && echo after" ] && echo "echo REAL-UPDATE && echo after  #slash: update"
     exit 0 ;;
   "install obsidian") echo "echo REAL-FLATPAK  #slash: install obsidian (not in apt, found in flatpak)"; exit 3 ;;
+  "search holiday")
+    echo "slash search holiday"
+    [ "$mode" = --words ] && [ "$entry" = "search holiday && echo after" ] && echo "slash search holiday && echo after"
+    exit 0 ;;
   "update firefox") [ "$mode" = --words ] && echo "slash: I can update everything" >&2; exit 2 ;;
 esac
 exit 1
@@ -219,6 +224,21 @@ class ShellCases:
 
     def records_layer2(self):
         return True
+
+    def test_own_verb_layer1(self):
+        self.start()
+        self.run_line("search holiday", "FOUND-holiday\n")
+        h = self.history()
+        self.assertIn("slash search holiday", h)
+        self.assertNotIn("#slash", h)
+
+    def test_own_verb_layer2_no_arrow(self):
+        self.start()
+        self.run_line("search holiday && echo after", "after\n")
+        self.assertIn("FOUND-holiday\n", self.sh.text())
+        self.assertNotIn("→", self.sh.text())
+        if self.records_layer2():
+            self.assertIn("slash search holiday && echo after", self.history())
 
     def test_layer2_ignorespace_not_recorded(self):
         self.start(before=self.cfg["ignorespace"])

@@ -28,10 +28,18 @@ type Result struct {
 	Confirm bool   // slash had to choose: show it, but let the user confirm
 	Reason  string // why it had to choose (shown in the comment)
 	Phrase  grammar.Phrase
+	// Own: the command is slash itself (search, about), which shows the
+	// real commands it runs. No "#slash:" comment, it would only repeat it.
+	Own bool
 }
 
 // Line is what goes onto the command line and into history.
-func (r Result) Line() string { return r.Command + "  " + r.comment() }
+func (r Result) Line() string {
+	if r.Own {
+		return r.Command
+	}
+	return r.Command + "  " + r.comment()
+}
 
 func (r Result) comment() string {
 	c := "#slash: " + r.Phrase.Text
@@ -75,6 +83,9 @@ func (r Result) HistoryEntry(entry string) string {
 	cmd := r.Command
 	if strings.ContainsAny(cmd, ";&|") {
 		cmd = "{ " + cmd + "; }" // keep the meaning inside a larger line
+	}
+	if r.Own {
+		return entry[:at] + cmd + entry[at+len(phrase):]
 	}
 	return entry[:at] + cmd + entry[at+len(phrase):] + "  " + r.comment()
 }
@@ -121,6 +132,8 @@ func (r *Resolver) Resolve(p grammar.Phrase) (Result, error) {
 		return r.install(p)
 	case grammar.Remove:
 		return r.remove(p)
+	case grammar.Search, grammar.About:
+		return r.own(p)
 	}
 	return Result{}, userErr("I don't know how to %s yet", p.Word)
 }
@@ -264,6 +277,20 @@ func (r *Resolver) build(p grammar.Phrase, key string, g grouping, reasons []str
 		Reason:  strings.Join(reasons, "; "),
 		Phrase:  p,
 	}, nil
+}
+
+// own hands the phrase to slash itself, after checking the source exists.
+func (r *Resolver) own(p grammar.Phrase) (Result, error) {
+	if p.Source != "" && p.Source != "files" && p.Source != "packages" {
+		if _, err := r.source(p.Source); err != nil {
+			return Result{}, err
+		}
+	}
+	words := make([]string, len(p.Words))
+	for i, w := range p.Words {
+		words[i] = Quote(w)
+	}
+	return Result{Command: "slash " + strings.Join(words, " "), Phrase: p, Own: true}, nil
 }
 
 // source maps a canonical source word to a source present on this system.

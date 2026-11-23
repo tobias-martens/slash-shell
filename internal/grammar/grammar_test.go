@@ -31,6 +31,17 @@ func TestParseLine(t *testing.T) {
 		{"install as flatpak", Install, []string{"as", "flatpak"}, "", "install as flatpak"},
 		{"remove spotify from snap", Remove, []string{"spotify"}, "snap", "remove spotify from snap"},
 		{"uninstall gimp", Remove, []string{"gimp"}, "", "uninstall gimp"},
+		{"search holiday", Search, []string{"holiday"}, "", "search holiday"},
+		{"search tom and jerry", Search, []string{"tom", "and", "jerry"}, "", "search tom and jerry"},
+		{"search report in files", Search, []string{"report"}, "files", "search report in files"},
+		{"search editor in packages", Search, []string{"editor"}, "packages", "search editor in packages"},
+		{"search editor in apps", Search, []string{"editor"}, "packages", "search editor in apps"},
+		{"search editor in flatpak", Search, []string{"editor"}, "flatpak", "search editor in flatpak"},
+		{"search files", Search, []string{"files"}, "", "search files"},
+		{"about vlc", About, []string{"vlc"}, "", "about vlc"},
+		{"describe vlc and gimp", About, []string{"vlc", "gimp"}, "", "describe vlc and gimp"},
+		{"about firefox in snap", About, []string{"firefox"}, "snap", "about firefox in snap"},
+		{"install foo in files", Install, []string{"foo", "in", "files"}, "", "install foo in files"},
 		{"install python3-pip libfoo++ g++", Install, []string{"python3-pip", "libfoo++", "g++"}, "", "install python3-pip libfoo++ g++"},
 	}
 	for _, tt := range tests {

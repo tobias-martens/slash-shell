@@ -85,6 +85,10 @@ func TestResolve(t *testing.T) {
 			want: "sudo apt remove vlc", confirm: true},
 		{name: "remove explicit flatpak", sys: ubuntu, line: "remove vlc from flatpak",
 			want: "flatpak uninstall org.videolan.VLC"},
+		{name: "search is slash's own", sys: ubuntu, line: "search holiday photos", want: "slash search holiday photos"},
+		{name: "search in files", sys: arch, line: "search report in files", want: "slash search report in files"},
+		{name: "search source missing", sys: arch, line: "search editor in flatpak", errText: "flatpak isn't installed"},
+		{name: "about", sys: ubuntu, line: "describe vlc", want: "slash describe vlc"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -161,5 +165,22 @@ func TestHistoryEntry(t *testing.T) {
 		if got := tt.r.HistoryEntry(tt.entry); got != tt.want {
 			t.Errorf("%q:\n got %q\nwant %q", tt.entry, got, tt.want)
 		}
+	}
+}
+
+func TestOwnCommands(t *testing.T) {
+	p, _ := grammar.Parse([]string{"search", "tom's file", "in", "files"})
+	r := &Resolver{Sys: ubuntu}
+	res, err := r.Resolve(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `slash search 'tom'\''s file' in files`; res.Line() != want {
+		t.Errorf("Line: got %q want %q", res.Line(), want)
+	}
+	q, _ := grammar.ParseLine("search holiday")
+	res, _ = r.Resolve(q)
+	if got, want := res.HistoryEntry("search holiday | less"), "slash search holiday | less"; got != want {
+		t.Errorf("HistoryEntry: got %q want %q", got, want)
 	}
 }

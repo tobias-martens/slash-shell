@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tobias-martens/slash-shell/internal/probe"
 	"github.com/tobias-martens/slash-shell/internal/takeover"
 )
 
@@ -14,6 +15,37 @@ type fakeProbe map[string]string // "source/pkg" → name
 
 func (f fakeProbe) Available(src, pkg string) (string, bool) { n, ok := f[src+"/"+pkg]; return n, ok }
 func (f fakeProbe) Installed(src, pkg string) (string, bool) { return "", false }
+
+func (f fakeProbe) Search(src string, words []string, limit int) ([]probe.Match, int, string, error) {
+	switch src {
+	case "apt":
+		ms := []probe.Match{{Name: "gnome-text-editor", Summary: "simple text editor for GNOME", Installed: true},
+			{Name: "mu-editor", Summary: "simple editor for beginner Python programmers"}}
+		return ms[:min(limit, 2)], 7, "apt-cache search editor", nil
+	case "flatpak":
+		return nil, 0, "", probe.ErrNoData
+	}
+	return nil, 0, "", nil
+}
+
+func (f fakeProbe) About(src, pkg string) (probe.Info, bool) {
+	switch {
+	case src == "apt" && pkg == "vlc":
+		return probe.Info{Source: "apt", Name: "vlc", Version: "3.0.23-1", Installed: "3.0.23-1",
+			Summary: "multimedia player and streamer", Homepage: "https://www.videolan.org/vlc/",
+			How: []string{"apt-cache show vlc"}}, true
+	case src == "flatpak" && pkg == "vlc":
+		return probe.Info{Source: "flatpak", Name: "org.videolan.VLC", Version: "3.0.24",
+			Summary: "VLC media player", How: []string{"flatpak's local catalog"}}, true
+	}
+	return probe.Info{Source: src, How: []string{src + " lookup"}}, false
+}
+
+type fakeFiles struct{ home string }
+
+func (f fakeFiles) Find(words []string, limit int) ([]string, int, string) {
+	return []string{f.home + "/Documents/editor notes.txt"}, 1, "find " + f.home + " -iname '*editor*'"
+}
 
 // newTestApp simulates an Ubuntu system with apt, flatpak and coreutils.
 func newTestApp(t *testing.T, bins ...string) (*app, *bytes.Buffer, *bytes.Buffer, *[]string) {
@@ -38,6 +70,7 @@ func newTestApp(t *testing.T, bins ...string) (*app, *bytes.Buffer, *bytes.Buffe
 		confirm: func(string) bool { return true },
 		execute: func(c string) int { ran = append(ran, c); return 0 },
 	}
+	a.files = fakeFiles{a.home}
 	a.env.LookPath = func(n string) (string, error) {
 		if present[n] {
 			return "/usr/bin/" + n, nil
@@ -190,10 +223,68 @@ func TestDoctor(t *testing.T) {
 		"zsh   not enabled (turn on with: slash enable zsh)",
 		"install   slash's; /usr/bin/install still handles files",
 		"update    /usr/bin/update was installed after slash and wins; slash's: slash update …",
-		"remove, uninstall, upgrade: slash's, no other program uses them",
+		"about, describe, remove, search, uninstall, upgrade: slash's, no other program uses them",
 	} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("missing %q in:\n%s", want, out.String())
 		}
+	}
+}
+
+func TestSearch(t *testing.T) {
+	a, out, _, ran := newTestApp(t)
+	a.getenv = func(string) string { return "" }
+	if code := a.run([]string{"search", "editor"}); code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	want := `Files  (find ~ -iname '*editor*')
+  ~/Documents/editor notes.txt
+
+apt  (apt-cache search editor)
+  gnome-text-editor  simple text editor for GNOME  [installed]
+  mu-editor          simple editor for beginner Python programmers
+  … 5 more: search editor in apt
+
+No package lists downloaded yet for flatpak; run: update
+`
+	if out.String() != want {
+		t.Errorf("got:\n%s\nwant:\n%s", out.String(), want)
+	}
+	if len(*ran) != 0 {
+		t.Errorf("search must not run commands through the shell: %v", *ran)
+	}
+	out.Reset()
+	a.run([]string{"search", "editor", "in", "files"})
+	if strings.Contains(out.String(), "apt") {
+		t.Errorf("in files must only search files:\n%s", out.String())
+	}
+}
+
+func TestAbout(t *testing.T) {
+	a, out, _, _ := newTestApp(t)
+	if code := a.run([]string{"about", "vlc"}); code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	want := `vlc: multimedia player and streamer
+Website: https://www.videolan.org/vlc/
+
+  apt      installed  3.0.23-1
+  flatpak  available  3.0.24    as org.videolan.VLC
+
+Read from: apt-cache show vlc; flatpak's local catalog
+`
+	if out.String() != want {
+		t.Errorf("got:\n%s\nwant:\n%s", out.String(), want)
+	}
+	out.Reset()
+	if code := a.run([]string{"describe", "nothing"}); code != 1 || !strings.Contains(out.String(), `No package called "nothing" here (looked in apt and flatpak). Similar names: search nothing`) {
+		t.Errorf("exit %d: %s", code, out.String())
+	}
+}
+
+func TestResolveOwnVerbs(t *testing.T) {
+	a, out, _, _ := newTestApp(t)
+	if code := a.run([]string{"resolve", "--line", "search holiday photos"}); code != exitRun || out.String() != "slash search holiday photos\n" {
+		t.Errorf("exit %d: %q", code, out.String())
 	}
 }

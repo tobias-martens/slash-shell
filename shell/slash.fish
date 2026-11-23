@@ -94,8 +94,8 @@ function __slash_run
     set -l rc $status
     set -l run (string replace -r -- '  #slash:.*' '' $out[1])
     switch $rc
-        case 0
-            printf '→ %s\n' $run >&2
+        case 0 # slash's own verbs (search, …) show what they run themselves
+            string match -q -- 'slash *' $run; or printf '→ %s\n' $run >&2
         case 3
             printf '→ %s\n' $out[1] >&2
             read -l -P "Run it? [y/N] " answer

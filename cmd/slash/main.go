@@ -37,7 +37,8 @@ const (
 type app struct {
 	stdout, stderr io.Writer
 	env            sources.Env
-	probe          resolve.Probe
+	probe          catalog
+	files          fileFinder
 	state          takeover.State
 	root           bool
 	home           string
@@ -52,6 +53,7 @@ func main() {
 		stderr:  os.Stderr,
 		env:     sources.RealEnv(),
 		probe:   probe.New(),
+		files:   probe.NewFiles(),
 		state:   takeover.DefaultState(),
 		root:    os.Geteuid() == 0,
 		home:    homeDir(),
@@ -174,6 +176,9 @@ func (a *app) direct(words []string) int {
 	res, code := a.resolveOrExplain(words)
 	if code != exitRun {
 		return code
+	}
+	if res.Own {
+		return a.lookup(res.Phrase)
 	}
 	fmt.Fprintf(a.stderr, "→ %s\n", res.Command)
 	if res.Confirm {

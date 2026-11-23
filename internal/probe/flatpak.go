@@ -10,8 +10,8 @@ import (
 	"strings"
 )
 
-// App is a flatpak application: its ID and display name.
-type App struct{ ID, Name string }
+// App is a flatpak application from the catalog.
+type App struct{ ID, Name, Summary, Homepage, Version string }
 
 // FlatpakCatalog reads the appstream catalogs flatpak keeps on disk. Parsing
 // a catalog (tens of MB of XML) is slow, so a small index is cached and
@@ -25,14 +25,39 @@ type FlatpakCatalog struct {
 // full ID, the last part of the ID (org.mozilla.firefox → firefox) or the
 // display name.
 func (c *FlatpakCatalog) Find(pkg string) (string, bool) {
-	var apps []App
+	a, ok := c.Lookup(pkg)
+	return a.ID, ok
+}
+
+// Lookup is Find, returning the whole catalog entry.
+func (c *FlatpakCatalog) Lookup(pkg string) (App, bool) {
+	apps, _ := c.Apps()
+	id, ok := match(apps, pkg)
+	for _, a := range apps {
+		if ok && a.ID == id {
+			return a, true
+		}
+	}
+	return App{}, false
+}
+
+// Apps returns every app in the local catalogs; ok is false if there are
+// no catalogs at all (flatpak hasn't downloaded any yet).
+func (c *FlatpakCatalog) Apps() (apps []App, ok bool) {
+	seen := map[string]bool{}
 	for _, g := range c.Globs {
 		paths, _ := filepath.Glob(g)
 		for _, path := range paths {
-			apps = append(apps, c.load(path)...)
+			ok = true
+			for _, a := range c.load(path) {
+				if !seen[a.ID] { // the same app can be in several remotes
+					seen[a.ID] = true
+					apps = append(apps, a)
+				}
+			}
 		}
 	}
-	return match(apps, pkg)
+	return apps, ok
 }
 
 // match prefers an exact ID, then the last ID part, then the display name.
@@ -59,7 +84,7 @@ func (c *FlatpakCatalog) load(path string) []App {
 	}
 	var cache string
 	if c.CacheDir != "" {
-		cache = filepath.Join(c.CacheDir, fmt.Sprintf("flatpak-%s-%s.tsv",
+		cache = filepath.Join(c.CacheDir, fmt.Sprintf("flatpak%d-%s-%s.tsv", indexVersion,
 			short(path), short(fmt.Sprintf("%d|%d", st.Size(), st.ModTime().UnixNano()))))
 		if apps, ok := readIndex(cache); ok {
 			return apps
@@ -77,7 +102,11 @@ func (c *FlatpakCatalog) load(path string) []App {
 	return apps
 }
 
-// scanAppstream extracts IDs and untranslated names of desktop applications.
+// indexVersion changes whenever the index's columns change.
+const indexVersion = 2
+
+// scanAppstream extracts desktop applications: ID, and untranslated name,
+// summary, homepage, and latest release version.
 // A line scanner instead of a full XML parser: much faster, and appstream
 // files written by flatpak keep id and name elements on their own lines.
 func scanAppstream(f *os.File) []App {
@@ -131,6 +160,12 @@ func step(apps []App, cur App, inApp bool, line string) ([]App, App, bool) {
 		cur.ID = strings.TrimSuffix(inner(line), ".desktop")
 	case inApp && cur.Name == "" && strings.HasPrefix(line, "<name>"):
 		cur.Name = unescape(inner(line))
+	case inApp && cur.Summary == "" && strings.HasPrefix(line, "<summary>"):
+		cur.Summary = unescape(inner(line))
+	case inApp && cur.Homepage == "" && strings.HasPrefix(line, `<url type="homepage">`):
+		cur.Homepage = unescape(inner(line))
+	case inApp && cur.Version == "" && strings.HasPrefix(line, "<release "):
+		cur.Version = attr(line, "version")
 	}
 	return apps, cur, inApp
 }
@@ -149,6 +184,16 @@ func inner(line string) string {
 	return line[i+1 : j]
 }
 
+// attr returns the value of name="…" in a tag.
+func attr(tag, name string) string {
+	_, rest, ok := strings.Cut(tag, " "+name+`="`)
+	if !ok {
+		return ""
+	}
+	v, _, _ := strings.Cut(rest, `"`)
+	return unescape(v)
+}
+
 var xmlEntities = strings.NewReplacer("&amp;", "&", "&lt;", "<", "&gt;", ">", "&quot;", `"`, "&apos;", "'")
 
 func unescape(s string) string { return xmlEntities.Replace(s) }
@@ -160,8 +205,8 @@ func readIndex(path string) ([]App, bool) {
 	}
 	var apps []App
 	for _, line := range strings.Split(string(data), "\n") {
-		if id, name, ok := strings.Cut(line, "\t"); ok {
-			apps = append(apps, App{ID: id, Name: name})
+		if f := strings.Split(line, "\t"); len(f) == 5 {
+			apps = append(apps, App{ID: f[0], Name: f[1], Summary: f[2], Homepage: f[3], Version: f[4]})
 		}
 	}
 	return apps, true
@@ -176,8 +221,10 @@ func writeIndex(path string, apps []App) {
 	prefix := base[:strings.LastIndexByte(base, '-')+1]
 	old, _ := filepath.Glob(filepath.Join(filepath.Dir(path), prefix+"*.tsv"))
 	var b strings.Builder
+	clean := strings.NewReplacer("\t", " ", "\n", " ")
 	for _, a := range apps {
-		b.WriteString(a.ID + "\t" + a.Name + "\n")
+		b.WriteString(strings.Join([]string{a.ID, clean.Replace(a.Name), clean.Replace(a.Summary),
+			clean.Replace(a.Homepage), clean.Replace(a.Version)}, "\t") + "\n")
 	}
 	tmp := path + ".tmp"
 	if os.WriteFile(tmp, []byte(b.String()), 0o644) == nil && os.Rename(tmp, path) == nil {

@@ -21,6 +21,7 @@ type Runner func(name string, args ...string) (stdout string, ok bool)
 type Probe struct {
 	Run       Runner
 	ReadFile  func(string) ([]byte, error)
+	Glob      func(string) ([]string, error) // nil: assume local data exists
 	Flatpak   *FlatpakCatalog
 	SnapNames string // path of snapd's local list of snap names
 }
@@ -32,6 +33,7 @@ func New() *Probe {
 	return &Probe{
 		Run:      ExecRunner(1500 * time.Millisecond),
 		ReadFile: os.ReadFile,
+		Glob:     filepath.Glob,
 		Flatpak: &FlatpakCatalog{
 			Globs: []string{
 				"/var/lib/flatpak/appstream/*/*/active/appstream.xml",

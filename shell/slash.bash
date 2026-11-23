@@ -86,8 +86,8 @@ __slash_run() {
     local run=${out%%$'\n'*} newentry=""
     [[ $out == *$'\n'* ]] && newentry=${out#*$'\n'}
     case $rc in
-        0)
-            printf '→ %s\n' "${run%  #slash:*}" >&2 ;;
+        0)  # slash's own verbs (search, …) show what they run themselves
+            [[ $run == "slash "* ]] || printf '→ %s\n' "${run%  #slash:*}" >&2 ;;
         3)
             printf '→ %s\n' "$run" >&2
             local answer

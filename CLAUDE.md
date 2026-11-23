@@ -47,6 +47,14 @@ under the same goals.
     is case-insensitive substring for both files (`plocate -i`,
     `find -iname '*x*'`) and packages. No fuzzy/typo matching in v1.
     Searching file *contents* is a later addition.
+    Built (stage 2): package names must contain every word; ranked exact
+    name, whole word part, prefix, rest. Shows 5 per section (30 when
+    narrowed with `in …`) and "… N more: search X in <section>". Hidden
+    files are skipped unless a word starts with ".". Flatpak results show
+    the app ID (what `install` takes) plus display name. Sources without
+    local data say "run: update". Verified 2026-11-24 with strace: no
+    AF_INET/AF_INET6 connection from `search` or `about` (only local
+    sockets: snapd, D-Bus, nscd).
   - `show <thing> [of|in|for <target>]` — fixed list of things; anything
     else prints "I can show: …". v1: `disk space` (`df -h -x tmpfs -x
     devtmpfs`), `size of <dir>` (`du -sh`), `biggest files in <dir>`
@@ -122,8 +130,9 @@ under the same goals.
     *without running it*, with the reason in the comment; Enter runs it,
     Ctrl-C cancels, the user may edit first.
   - Verbs with own output or follow-ups (`search`, `about`, `stop <program>`)
-    rewrite to `slash <verb> …  #slash: …`; slash then prints the real
-    commands it runs.
+    rewrite to `slash <verb> …` (no `#slash:` comment, it would only repeat
+    the line); slash then shows the real commands it ran (search: in each
+    section header; about: a "Read from:" line).
   - Only whole lines are rewritten; compound lines are handled by layer 2.
   - Layer 2 — fallback functions: `init` also defines one shell function per
     verb, used only when layer 1 didn't rewrite the line (compound lines like

@@ -16,7 +16,7 @@ func Render(sys sources.System, version string) string {
 	b.WriteString("slash: simple and natural commands for your terminal.\n")
 	b.WriteString("Every command shows what it really runs, so you learn as you go.\n")
 	if strings.HasPrefix(version, "0.") {
-		fmt.Fprintf(&b, "(version %s: in development, the commands below don't work yet)\n", version)
+		fmt.Fprintf(&b, "(version %s: in development, not every command below works yet)\n", version)
 	}
 	b.WriteString("\n")
 
