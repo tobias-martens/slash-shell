@@ -27,10 +27,13 @@ always have the same version.
 - Verbs: `update`/`upgrade`, `install`, `remove`/`uninstall`, incl. the
   coreutils `install` pass-through rule and "ask before using another source".
 - sudo rules (per verb × source; never for flatpak; skip when root).
-- Shell glue for bash, zsh, fish: show `→ real command`, rewrite history
-  (`real command  #slash: phrase`; fish may skip this at first), execute.
-- Installer/uninstaller (per user, one line in the shell rc file): record
-  existing collisions, report them, "newest install wins" at call time.
+- Shell glue for bash, zsh, fish: Enter hook rewrites a slash phrase into
+  `real command  #slash: phrase`; the shell runs and records it natively.
+  Confirm-before-run when slash had to choose; fail open on any error.
+- Installer/uninstaller (per user, one guarded block in the rc file): record
+  existing collisions, report them, "newest install wins" at rewrite time.
+  Uninstall restores everything exactly (CI-tested: rc file byte-identical,
+  taken-over commands work as before).
 - `slash` intro screen; `slash doctor`; `slash resolve` (dry run).
 
 ## Stage 2 — search and about (offline only)

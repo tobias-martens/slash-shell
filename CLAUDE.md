@@ -101,25 +101,51 @@ under the same goals.
   `search` (Go dev packages), `show` (nmh), `pack` (allegro dev tools),
   `start`/`stop`/`restart` (some Alpine package, unverified). Never usable:
   `old` (openSUSE base package `aaa_base`).
-- Takeover policy, "newest install wins":
-  - Commands that already exist when slash is installed: slash takes over;
-    the original stays reachable via the shell builtin `command <name>`. These
-    collisions are recorded in a state file and reported once at install time.
-  - Commands installed *after* slash win: each slash verb function checks at
-    call time (`type -P`) whether a real command with its name exists that is
-    not in the recorded list; if so it silently runs that command instead
-    (`command <name> "$@"`), and a one-time notice says slash's verb is now
-    reachable as `slash <verb>`. Works immediately, even in the same session;
-    if the program is removed again, slash's verb comes back by itself.
-  - The user's own aliases/functions always win; slash never overwrites one
-    that already exists when it is loaded.
-  - Reinstalling slash is again the newest intent: it re-records collisions
-    and takes over (with the install-time notice).
-  - Scripts are never affected (functions aren't exported).
-  - Coreutils `install` is special-cased: any call it could execute
-    successfully (options, or an operand that is an existing file/path) is
-    passed through to it.
-- fish: v1 may show the real command without rewriting history; fix later.
+- Mechanism: **line rewriting on Enter** (decided 2026-11-23). When the
+  user presses Enter and the whole line is a slash phrase, the shell hook
+  replaces the line with the real command plus a comment, e.g.
+  `sudo apt update && sudo apt upgrade  #slash: update`, and the shell runs
+  and records it natively — no history manipulation, no separate "→" output,
+  no shell functions or aliases defined at all.
+  - fish: `abbr --function` (fish ≥ 3.6). zsh: wrapper widget around
+    `accept-line`. bash (≥ 4): Enter bound to "rewrite line, then
+    accept-line" (emacs and vi keymaps; ble.sh needs its own hook).
+  - When slash had to choose or assume something (e.g. package not in the
+    system PM but found in flatpak), it writes the command onto the line
+    *without running it*, with the reason in the comment; Enter runs it,
+    Ctrl-C cancels, the user may edit first.
+  - Verbs with own output or follow-ups (`search`, `about`, `stop <program>`)
+    rewrite to `slash <verb> …  #slash: …`; slash then prints the real
+    commands it runs.
+  - Only whole lines are rewritten; `update && reboot` is left alone.
+  - Fail open: if the slash binary is missing, errors or is slow, the line is
+    accepted unchanged. A broken slash must never block the user's Enter key.
+- Takeover policy, "newest install wins" (all decided at rewrite time; slash
+  never modifies, wraps or shadows any binary):
+  - Names that already exist when slash is installed: slash rewrites them;
+    `command <name> …` runs the original (first word isn't a verb, so it's
+    never rewritten). Recorded in a state file, reported once at install.
+  - Commands installed *after* slash win: if a real command with the verb's
+    name exists that isn't in the recorded list, the line is left alone and a
+    one-time notice says slash's verb is now reachable as `slash <verb>`. If
+    that program is removed again, the verb comes back by itself.
+  - The user's own aliases/functions with a verb's name always win.
+  - Reinstalling slash is again the newest intent: re-records and takes over.
+  - Coreutils `install`: lines it could execute successfully (options, or an
+    operand that is an existing file/path) are never rewritten.
+- Clean uninstall: removing slash must leave everything exactly as before.
+  - The installer only adds one marked block to the rc file(s), guarded so a
+    missing binary is harmless:
+    `command -v slash >/dev/null && eval "$(slash init bash)"`.
+  - The uninstaller removes exactly that block, the binary and slash's state
+    dir (`~/.local/state/slash`) — nothing else.
+  - Since slash never touches other programs, any command it took over works
+    as before immediately; already-open shells keep working thanks to
+    fail-open. History entries stay valid, as they are real commands.
+  - Distro packages can't edit users' rc files — the guard above covers a
+    package removal.
+  - CI test: install → use → uninstall → the rc file is byte-identical and
+    previously taken-over commands behave as before.
 - Grammar: `<verb> <thing>[, <thing>] [and <thing>] [as|from|via|in <source>]`,
   plus `update <source>` / `update only <source>`. For `search`, `files` and
   `packages` also count as sources. Connector words only count in
@@ -156,8 +182,8 @@ under the same goals.
   installed command, confirm with `[Y/n]` (Enter = yes), never non-interactive.
   Chains to the distro's existing command-not-found handler.
 - Architecture: one static Go binary `slash`. The resolver (`slash resolve …`)
-  only prints the command. The shell glue (display, history, execute,
-  completion) is embedded in the binary and loaded the zoxide/starship way:
+  only prints the command. The shell glue (Enter hook, completion) is
+  embedded in the binary and loaded the zoxide/starship way:
   `eval "$(slash init bash)"` (also `zsh`, `fish`) in the rc file. Command
   mappings are data files (embedded at build time), not code.
 - License: GPL-3.0. No user configuration planned. Homebrew and distro
