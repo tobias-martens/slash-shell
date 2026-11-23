@@ -9,11 +9,11 @@ import (
 	"strings"
 )
 
-//go:embed slash.bash
+//go:embed slash.bash slash.zsh slash.fish
 var files embed.FS
 
 // Supported lists the shells `slash init` knows.
-var Supported = []string{"bash"}
+var Supported = []string{"bash", "zsh", "fish"}
 
 // Script returns the integration for shell, with the verb words filled in.
 func Script(shell string, verbs []string) (string, error) {

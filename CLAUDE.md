@@ -107,9 +107,16 @@ under the same goals.
   replaces the line with the real command plus a comment, e.g.
   `sudo apt update && sudo apt upgrade  #slash: update`, and the shell runs
   and records it natively — no history manipulation, no separate "→" output.
-  - fish: `abbr --function` (fish ≥ 3.6). zsh: wrapper widget around
-    `accept-line`. bash (≥ 4): Enter bound to "rewrite line, then
-    accept-line" (emacs and vi keymaps; ble.sh needs its own hook).
+  - fish (≥ 3.1): Enter bound to a function that rewrites the line
+    (`commandline -r`) and then runs `execute`; rebound when the key binding
+    mode changes (default and vi insert mode). Not `abbr --function`: abbrs
+    also expand on space. zsh (≥ 5.3): own widget on Enter (emacs, viins,
+    vicmd) that rewrites `$BUFFER`, then calls `accept-line`. zsh only treats
+    `#` as a comment with `interactive_comments`: slash switches it on for a
+    line that carries `  #slash: ` (also recalled from history) and off
+    again in `preexec`/`precmd`, so the user's setting never changes.
+    bash (≥ 4): Enter bound to "rewrite line, then accept-line" (emacs and
+    vi keymaps; ble.sh needs its own hook).
   - When slash had to choose or assume something (e.g. package not in the
     system PM but found in flatpak), it writes the command onto the line
     *without running it*, with the reason in the comment; Enter runs it,
@@ -124,7 +131,9 @@ under the same goals.
     tools owning Enter). The function asks the same resolver (same takeover
     rules, coreutils `install` rule, fail open), prints `→ real command`,
     runs it, and appends `real command  #slash: phrase` to history
-    (bash `history -s`, zsh `print -s`; fish: no reliable way, skipped).
+    (bash: see below; zsh `print -s` and fish ≥ 4.1 `history append`, both
+    after the typed line; skipped for lines the shell itself doesn't record,
+    e.g. a leading space with hist_ignore_space or fish's private mode).
     Functions exist only in interactive sessions: scripts are untouched,
     `command <name>` bypasses them, uninstall stays clean.
   - ble.sh: own hook later, so it gets layer 1 too.
