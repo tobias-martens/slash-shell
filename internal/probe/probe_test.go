@@ -72,7 +72,7 @@ func TestProbeCommands(t *testing.T) {
 	run := func(name string, args ...string) (string, bool) {
 		calls = append(calls, name+" "+strings.Join(args, " "))
 		switch name + " " + strings.Join(args, " ") {
-		case "apt-cache show --no-all-versions -- vlc", "rpm -q -- vlc", "snap list -- spotify":
+		case "apt-cache --no-generate show -- vlc", "rpm -q -- vlc", "snap list -- spotify":
 			return "", true
 		case "dpkg-query -W -f=${db:Status-Abbrev} -- gimp":
 			return "ii ", true

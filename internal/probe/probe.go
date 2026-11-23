@@ -59,7 +59,10 @@ func ExecRunner(timeout time.Duration) Runner {
 func (p *Probe) Available(source, pkg string) (string, bool) {
 	switch source {
 	case "apt":
-		_, ok := p.Run("apt-cache", "show", "--no-all-versions", "--", pkg)
+		// --no-generate: use the existing cache instead of rebuilding it in
+		// memory (800 ms → 20 ms; it is refreshed by every `update`). No
+		// --no-all-versions: computing version priorities costs another 140 ms.
+		_, ok := p.Run("apt-cache", "--no-generate", "show", "--", pkg)
 		return pkg, ok
 	case "dnf":
 		_, ok := p.Run("dnf", "--cacheonly", "--quiet", "info", pkg)
