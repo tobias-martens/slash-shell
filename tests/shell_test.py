@@ -318,6 +318,9 @@ class ZshTest(ShellCases, unittest.TestCase):
 
     def start(self, *a, **kw):
         os.environ.pop("ZDOTDIR", None)
+        # Debian/Ubuntu's /etc/zsh/zshrc runs compinit, which stops to ask
+        # where system folders look insecure (GitHub's runners).
+        os.environ["skip_global_compinit"] = "1"
         super().start(*a, **kw)
 
     def test_tab_completion(self):
