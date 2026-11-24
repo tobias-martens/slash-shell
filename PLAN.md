@@ -99,9 +99,10 @@ always have the same version.
   tag v1.0 (release workflow builds the binaries the installer downloads).
 
 ## After v1
-- **Vocabulary study (thorough, before adding verbs or synonyms):** collect
-  what everyday tasks newcomers actually look for (forum questions, "how do
-  I … in Linux" searches, beginner guides, AskUbuntu/Reddit titles) and
+- **Vocabulary study (thorough, before adding verbs or synonyms):** from
+  public sources on the web only (AskUbuntu, Unix & Linux Stack Exchange,
+  distro forums, beginner guides) — never from slash's users, whose data
+  slash never collects. Find what everyday tasks newcomers ask about and
   which words they use for each ("get rid of", "uninstall", "delete",
   "kill", "close", "unzip", "extract", "free up space", …). Map each to
   slash's verbs and check the fit is extremely good: the words people use

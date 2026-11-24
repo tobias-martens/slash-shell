@@ -36,6 +36,10 @@ under the same goals.
    to use a verb when something already present can do the job: data tables
    list alternatives in order (`archives.tsv`, `show.tsv`: rows for the same
    thing), and slash uses the first whose programs exist.
+9. **No data collection.** slash never collects, stores or sends anything
+   about its users or their use of it: no telemetry, no usage statistics,
+   no "anonymous" reports. Research about how people phrase tasks uses
+   public sources on the web only.
 
 ## Agreed design
 
