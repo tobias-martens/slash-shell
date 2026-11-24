@@ -64,9 +64,12 @@ func (p *Probe) Available(source, pkg string) (string, bool) {
 		// --no-generate: use the existing cache instead of rebuilding it in
 		// memory (800 ms → 20 ms; it is refreshed by every `update`). No
 		// --no-all-versions: computing version priorities costs another 140 ms.
-		_, ok := p.Run("apt-cache", "--no-generate", "show", "--", pkg)
+		_, ok := p.aptCache("show", "--", pkg)
 		return pkg, ok
 	case "dnf":
+		if strings.HasPrefix(pkg, "-") {
+			return pkg, false // dnf 5 doesn't accept "--"
+		}
 		_, ok := p.Run("dnf", "--cacheonly", "--quiet", "info", pkg)
 		return pkg, ok
 	case "pacman":
@@ -84,6 +87,17 @@ func (p *Probe) Available(source, pkg string) (string, bool) {
 		return pkg, p.snapNameExists(pkg)
 	}
 	return "", false
+}
+
+// aptCache runs apt-cache on the existing binary cache (--no-generate:
+// 20 ms instead of 800). `apt clean` deletes that cache, though; then
+// apt-cache rebuilds it from the package lists, slower but still offline.
+func (p *Probe) aptCache(args ...string) (string, bool) {
+	out, ok := p.Run("apt-cache", append([]string{"--no-generate"}, args...)...)
+	if ok || out != "" {
+		return out, ok
+	}
+	return p.Run("apt-cache", args...)
 }
 
 // Installed implements resolve.Probe.

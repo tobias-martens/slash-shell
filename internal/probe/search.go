@@ -125,12 +125,12 @@ func regexWords(words []string) []string {
 }
 
 func (p *Probe) searchApt(words []string) ([]Match, string, error) {
-	args := append([]string{"--no-generate", "search", "--names-only", "--"}, regexWords(words)...)
+	args := append([]string{"search", "--names-only", "--"}, regexWords(words)...)
 	how := "apt-cache " + strings.Join(args, " ")
 	if !p.has("/var/lib/apt/lists/*_Packages*") {
 		return nil, how, ErrNoData
 	}
-	out, ok := p.Run("apt-cache", args...)
+	out, ok := p.aptCache(args...)
 	if !ok && out == "" {
 		return nil, how, ErrNoData
 	}
@@ -147,7 +147,14 @@ func (p *Probe) searchApt(words []string) ([]Match, string, error) {
 var dnfLine = regexp.MustCompile(`^\s*(\S+)\.(?:x86_64|noarch|i686|aarch64|ppc64le|s390x|armv7hl|riscv64)\s*(?::\s|\t)\s*(.*)$`)
 
 func (p *Probe) searchDnf(words []string) ([]Match, string, error) {
-	args := append([]string{"--cacheonly", "--quiet", "search", "--"}, words...)
+	// dnf 5 rejects "--", so words that look like options are left out
+	// (filterRank still applies every word to the results).
+	args := []string{"--cacheonly", "--quiet", "search"}
+	for _, w := range words {
+		if !strings.HasPrefix(w, "-") {
+			args = append(args, w)
+		}
+	}
 	how := "dnf " + strings.Join(args, " ")
 	out, ok := p.Run("dnf", args...)
 	if !ok && out == "" {

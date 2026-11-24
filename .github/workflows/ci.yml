@@ -17,3 +17,19 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y zsh fish
       - name: shell integration (real interactive shells in a pty)
         run: SLASH_BIN=$PWD/slash python3 -I tests/shell_test.py
+
+  distros:
+    # The real package managers, shells and offline lookups on each distro.
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [debian:13, ubuntu:24.04, fedora:43, archlinux:latest, opensuse/tumbleweed, alpine:edge]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: CGO_ENABLED=0 go build -o slash ./cmd/slash
+      - run: tests/distro/docker.sh ${{ matrix.image }} slash

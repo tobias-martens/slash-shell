@@ -374,7 +374,9 @@ class EndToEnd:
         self.bindir = os.path.join(self.tmp, "bin")
         os.mkdir(self.bindir)
         shutil.copy(SLASH_BIN, os.path.join(self.bindir, "slash"))
-        for tool in ["sudo", "flatpak", "snap"]:
+        # Fakes: nothing real may ever run, also as root (where slash
+        # leaves out sudo and would call apt directly).
+        for tool in ["sudo", "apt", "flatpak", "snap"]:
             path = os.path.join(self.bindir, tool)
             with open(path, "w") as f:
                 f.write(FAKE_TOOL)
@@ -424,14 +426,15 @@ class EndToEnd:
         self.assertIn("enabled for " + self.NAME, r.stdout)
 
         self.shell()
+        sudo = "" if os.geteuid() == 0 else "sudo "
         self.sh.send("update\r")
-        self.sh.expect("FAKE-sudo apt update")
+        self.sh.expect("FAKE-" + sudo + "apt update")
         self.sh.expect("FAKE-flatpak update")
-        self.sh.expect("FAKE-sudo snap refresh")
+        self.sh.expect("FAKE-" + sudo + "snap refresh")
         self.sh.mark()
         hist = SHELLS[self.NAME]["history"]
         self.sh.send(hist + "\r")
-        self.sh.expect(r"sudo apt update && sudo apt upgrade; flatpak update; sudo snap refresh  #slash: update")
+        self.sh.expect(re.escape("{0}apt update && {0}apt upgrade; flatpak update; {0}snap refresh  #slash: update".format(sudo)))
         self.sh.mark()
         self.sh.send("install -m 644 %s %s/copy\r" % (self.rc, self.tmp))  # coreutils install, untouched
         self.sh.expect("PROMPT> ")

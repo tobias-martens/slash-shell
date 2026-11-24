@@ -22,9 +22,8 @@ func (p *Probe) About(source, pkg string) (info Info, ok bool) {
 	info = Info{Source: source, Name: pkg}
 	switch source {
 	case "apt":
-		args := []string{"--no-generate", "show", "--", pkg}
-		info.How = []string{"apt-cache " + strings.Join(args, " "), "dpkg-query -W -- " + pkg}
-		out, _ := p.Run("apt-cache", args...)
+		info.How = []string{"apt-cache show -- " + pkg, "dpkg-query -W -- " + pkg}
+		out, _ := p.aptCache("show", "--", pkg)
 		f := fields(firstStanza(out), ":")
 		if f["Package"] == "" {
 			return info, false
@@ -36,7 +35,10 @@ func (p *Probe) About(source, pkg string) (info Info, ok bool) {
 			info.Installed = version
 		}
 	case "dnf":
-		args := []string{"--cacheonly", "--quiet", "info", "--", pkg}
+		if strings.HasPrefix(pkg, "-") {
+			return info, false // dnf 5 doesn't accept "--": never pass an option
+		}
+		args := []string{"--cacheonly", "--quiet", "info", pkg}
 		info.How = []string{"dnf " + strings.Join(args, " "), "rpm -q -- " + pkg}
 		out, _ := p.Run("dnf", args...)
 		f := fields(out, ":")

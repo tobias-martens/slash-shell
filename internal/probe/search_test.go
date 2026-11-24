@@ -57,6 +57,9 @@ func TestSearchParsers(t *testing.T) {
 			t.Errorf("%s: how = %q", src, how)
 		}
 		for _, c := range calls {
+			if strings.HasPrefix(c, "dnf ") && strings.Contains(c, " -- ") {
+				t.Errorf("dnf 5 rejects --: %q", c)
+			}
 			for _, online := range []string{"refresh", "makecache", "-Sy", "update"} {
 				if strings.Contains(" "+c+" ", " "+online+" ") {
 					t.Errorf("%s: %q may go online", src, c)
@@ -136,5 +139,22 @@ func TestFilesRanking(t *testing.T) {
 	args := strings.Join(f.findArgs([]string{"a*b"}), " ")
 	if args != `/home/u -xdev -name .* -prune -o -iname *a\*b* -print` {
 		t.Errorf("find args: %s", args)
+	}
+}
+
+func TestAptWithoutBinaryCache(t *testing.T) {
+	// After `apt clean` the binary cache is gone: --no-generate fails, the
+	// plain call rebuilds it from the lists.
+	var calls []string
+	p := &Probe{Run: func(name string, args ...string) (string, bool) {
+		calls = append(calls, strings.Join(args, " "))
+		if args[0] == "--no-generate" {
+			return "", false
+		}
+		return "tree - displays a tree view\n", true
+	}}
+	top, _, _, err := p.Search("apt", []string{"tree"}, 5)
+	if err != nil || len(top) != 1 || top[0].Name != "tree" {
+		t.Errorf("got %v %v (calls %v)", top, err, calls)
 	}
 }
