@@ -22,9 +22,6 @@ Your history keeps it this way: the real command, with your words as a
 comment. On Fedora the same word becomes `sudo dnf upgrade`, and on Arch
 `sudo pacman -Syu`.
 
-> **Status:** v1.0 is being prepared and not released yet. The install
-> command below works once it is.
-
 ## What you can say
 
 | You type | slash runs (on Ubuntu, for example) |
