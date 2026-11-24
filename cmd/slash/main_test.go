@@ -16,8 +16,12 @@ import (
 
 type fakeProbe map[string]string // "source/pkg" → name
 
-func (f fakeProbe) Available(src, pkg string) (string, bool) { n, ok := f[src+"/"+pkg]; return n, ok }
-func (f fakeProbe) Installed(src, pkg string) (string, bool) { return "", false }
+func (f fakeProbe) Available(src, pkg string) (string, bool)         { n, ok := f[src+"/"+pkg]; return n, ok }
+func (f fakeProbe) Choices(src, pkg string, installed bool) []string { return nil }
+func (f fakeProbe) Installed(src, pkg string) (string, bool) {
+	n, ok := f[src+"/installed/"+pkg]
+	return n, ok
+}
 
 func (f fakeProbe) Search(src string, words []string, limit int) ([]probe.Match, int, string, error) {
 	switch src {
@@ -59,7 +63,7 @@ func (fakeSvc) Active(_, n string) bool { return n != "cups" }
 func (fakeSvc) Program(n string) bool   { _, ok := probe.FindProgram(fakeSvc{}.Programs(), n); return ok }
 func (fakeSvc) Programs() []probe.Program {
 	return []probe.Program{{Name: "firefox", PIDs: []int{20, 22}}, {Name: "stubborn", PIDs: []int{30}},
-		{Name: "docker", PIDs: []int{40}}}
+		{Name: "docker", PIDs: []int{40}}, {Name: "python", PIDs: []int{50}}, {Name: "python", PIDs: []int{60}}}
 }
 func (fakeSvc) Running(scope string) []string {
 	if scope == "user" {
@@ -87,7 +91,7 @@ func newTestApp(t *testing.T, bins ...string) (*app, *bytes.Buffer, *bytes.Buffe
 	}
 	a := &app{
 		stdout: &out, stderr: &errOut,
-		probe: fakeProbe{"apt/vlc": "vlc", "flatpak/obsidian": "md.obsidian.Obsidian"},
+		probe: fakeProbe{"apt/vlc": "vlc", "apt/installed/vlc": "vlc", "flatpak/obsidian": "md.obsidian.Obsidian"},
 		state: takeover.State{Dir: t.TempDir() + "/slash"},
 		home:  t.TempDir(),
 		getenv: func(k string) string {
@@ -397,6 +401,20 @@ func TestStop(t *testing.T) {
 		t.Errorf("force: %s %v", errOut.String(), f.signals)
 	}
 
+	// Two programs called python: lists both, stops both only when told.
+	f.signals, asked = nil, ""
+	errOut.Reset()
+	a.ask = func(q string) string { asked = q; return "" }
+	a.run([]string{"stop", "python"})
+	if len(f.signals) != 0 || asked != "Stop all 2? [y/N] " || !strings.Contains(errOut.String(), "2 programs called python are running:\n  python (process 50)\n  python (process 60)") {
+		t.Errorf("signals %v, asked %q: %s", f.signals, asked, errOut.String())
+	}
+	a.ask = func(string) string { return "y" }
+	a.run([]string{"stop", "python"})
+	if strings.Join(f.signals, " ") != "50:15 60:15" {
+		t.Errorf("signals %v", f.signals)
+	}
+
 	// A service and a program with the same name: asks which.
 	*ran = nil
 	a.ask = func(string) string { return "s" }
@@ -421,7 +439,7 @@ func TestStop(t *testing.T) {
 func TestListAndComplete(t *testing.T) {
 	a, out, _, _ := newTestApp(t)
 	a.run([]string{"stop"})
-	want := "Programs:\n  firefox, stubborn, docker\nServices:\n  docker, ssh\nYour services:\n  pipewire\n\nStop one with: stop <name>\n"
+	want := "Programs:\n  firefox, stubborn, docker, python (2)\nServices:\n  docker, ssh\nYour services:\n  pipewire\n\nStop one with: stop <name>\n"
 	if out.String() != want {
 		t.Errorf("got:\n%s", out.String())
 	}
@@ -432,7 +450,7 @@ func TestListAndComplete(t *testing.T) {
 	}
 	out.Reset()
 	a.run([]string{"complete", "stop"})
-	if out.String() != "docker\nfirefox\npipewire\nssh\nstubborn\n" {
+	if out.String() != "docker\nfirefox\npipewire\npython\nssh\nstubborn\n" {
 		t.Errorf("complete stop: %q", out.String())
 	}
 	out.Reset()
@@ -454,5 +472,26 @@ func TestShow(t *testing.T) {
 	}
 	if code := a.run([]string{"resolve", "--words", "show", "cats"}); code != exitUserError || !strings.Contains(errOut.String(), "I can show:") {
 		t.Errorf("exit %d: %s", code, errOut.String())
+	}
+}
+
+// Without gio or trash-put, delete moves the file to the trash itself.
+func TestDeleteOwnTrash(t *testing.T) {
+	a, _, errOut, ran := newTestApp(t)
+	t.Chdir(a.home)
+	os.WriteFile("notes.txt", []byte("x"), 0o644)
+	var out bytes.Buffer
+	a.stdout = &out
+	if code := a.run([]string{"resolve", "--line", "delete notes.txt"}); code != exitRun || out.String() != "slash delete notes.txt\n" {
+		t.Fatalf("code %d, line %q", code, out.String())
+	}
+	if code := a.run([]string{"delete", "notes.txt"}); code != 0 || len(*ran) != 0 {
+		t.Fatalf("code %d, ran %v, %s", code, *ran, errOut)
+	}
+	if _, err := os.Stat(a.home + "/.local/share/Trash/files/notes.txt"); err != nil {
+		t.Errorf("not in the trash: %v; %s", err, errOut)
+	}
+	if !strings.Contains(errOut.String(), "→ moved notes.txt to the trash: ~/.local/share/Trash/files/notes.txt") {
+		t.Errorf("output: %s", errOut)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -29,14 +30,18 @@ func (c *FlatpakCatalog) Find(pkg string) (string, bool) {
 	return a.ID, ok
 }
 
+// Choices returns the app IDs when several apps match pkg equally well;
+// slash then asks which one instead of picking.
+func (c *FlatpakCatalog) Choices(pkg string) []string {
+	apps, _ := c.Apps()
+	return ids(matches(apps, pkg))
+}
+
 // Lookup is Find, returning the whole catalog entry.
 func (c *FlatpakCatalog) Lookup(pkg string) (App, bool) {
 	apps, _ := c.Apps()
-	id, ok := match(apps, pkg)
-	for _, a := range apps {
-		if ok && a.ID == id {
-			return a, true
-		}
+	if m := matches(apps, pkg); len(m) == 1 {
+		return m[0], true
 	}
 	return App{}, false
 }
@@ -61,20 +66,46 @@ func (c *FlatpakCatalog) Apps() (apps []App, ok bool) {
 }
 
 // match prefers an exact ID, then the last ID part, then the display name.
-func match(apps []App, pkg string) (string, bool) {
+// matches returns the apps that match pkg best: by app ID, else by the
+// last part of the ID, else by display name. More than one (distinct IDs)
+// means pkg is ambiguous.
+func matches(apps []App, pkg string) []App {
 	want := strings.ToLower(pkg)
 	for _, rank := range []func(App) string{
 		func(a App) string { return strings.ToLower(a.ID) },
 		func(a App) string { return strings.ToLower(a.ID[strings.LastIndexByte(a.ID, '.')+1:]) },
 		func(a App) string { return strings.ToLower(a.Name) },
 	} {
+		var found []App
 		for _, a := range apps {
-			if rank(a) == want {
-				return a.ID, true
+			if rank(a) == want && !slices.ContainsFunc(found, func(f App) bool { return f.ID == a.ID }) {
+				found = append(found, a)
 			}
 		}
+		if len(found) > 0 {
+			return found
+		}
+	}
+	return nil
+}
+
+// match returns the app ID for pkg if exactly one app matches.
+func match(apps []App, pkg string) (string, bool) {
+	if m := matches(apps, pkg); len(m) == 1 {
+		return m[0].ID, true
 	}
 	return "", false
+}
+
+func ids(apps []App) []string {
+	if len(apps) < 2 {
+		return nil
+	}
+	out := make([]string, len(apps))
+	for i, a := range apps {
+		out[i] = a.ID
+	}
+	return out
 }
 
 func (c *FlatpakCatalog) load(path string) []App {

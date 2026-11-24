@@ -1,5 +1,13 @@
 name: ci
-on: [push, pull_request]
+# Unit and shell tests on every push. The distro tests (six containers,
+# real package managers) run for release tags and when started by hand.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -23,6 +31,7 @@ jobs:
   distros:
     # The real package managers, shells and offline lookups on each distro.
     needs: test
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

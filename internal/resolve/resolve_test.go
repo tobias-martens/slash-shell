@@ -17,6 +17,12 @@ func (f fakeProbe) Available(src, pkg string) (string, bool) {
 	n, ok := f.avail[src+"/"+pkg]
 	return n, ok
 }
+func (f fakeProbe) Choices(src, pkg string, installed bool) []string {
+	if src == "flatpak" && pkg == "notes" && !installed {
+		return []string{"org.a.Notes", "org.b.Notes"}
+	}
+	return nil
+}
 func (f fakeProbe) Installed(src, pkg string) (string, bool) {
 	n, ok := f.inst[src+"/"+pkg]
 	return n, ok
@@ -73,8 +79,14 @@ func TestResolve(t *testing.T) {
 			want: "flatpak install md.obsidian.Obsidian", confirm: true},
 		{name: "install mixed sources", sys: ubuntu, line: "install vlc, obsidian",
 			want: "sudo apt install vlc; flatpak install md.obsidian.Obsidian", confirm: true},
-		{name: "install unknown lets apt report it", sys: ubuntu, line: "install nosuchthing",
-			want: "sudo apt install nosuchthing"},
+		{name: "install unknown: says so, never guesses a source", sys: ubuntu, line: "install nosuchthing",
+			errText: `I found no package called "nosuchthing" in apt, flatpak and snap. Similar names: search nosuchthing`},
+		{name: "remove what isn't installed: says so", sys: ubuntu, line: "remove nosuchthing",
+			errText: "nosuchthing isn't installed (I looked in apt, flatpak and snap). To find its exact name: search nosuchthing"},
+		{name: "found in flatpak and snap: names both", sys: ubuntu, line: "install obsidian",
+			want: "flatpak install md.obsidian.Obsidian", confirm: true},
+		{name: "ambiguous flatpak name: asks which", sys: ubuntu, line: "install notes",
+			errText: "several flatpak apps are called \"notes\": org.a.Notes, org.b.Notes. Say which, e.g.: install org.a.Notes"},
 		{name: "steamos installs flatpak by default", sys: steamos, line: "install firefox",
 			want: "flatpak install org.mozilla.firefox"},
 		{name: "source not on system", sys: fedora, line: "install foo as snap", errText: "snap isn't installed"},

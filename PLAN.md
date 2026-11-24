@@ -87,12 +87,28 @@ always have the same version.
 - README rewritten (2026-11-24): every example's command taken from real
   `slash resolve` output on Ubuntu; describes line rewriting, asking,
   offline search, takeover rules, install/uninstall, supported systems.
-- `pack` defaults to `.zip` (2026-11-24); without zip it says how to get it
-  or to use tar.gz.
+- `pack` defaults to `.zip` (2026-11-24), made with whatever is installed
+  (zip, 7z, bsdtar, python3), else `.tar.gz`; `unpack`, `show` and `delete`
+  also fall back to installed tools (slash's own trash without gio).
+- No-guessing sweep (2026-11-24): `install`/`remove` say "not found / not
+  installed" instead of passing the name to the package manager; several
+  flatpak apps, programs or services with one name → listed and asked.
+  Distro tests pass on Debian, Ubuntu, Fedora, Arch and Alpine; openSUSE
+  not re-run yet (its mirror stalled the test setup).
   Still to do: create the public repo (needs the user's OK), first CI run,
   tag v1.0 (release workflow builds the binaries the installer downloads).
 
 ## After v1
+- **Vocabulary study (thorough, before adding verbs or synonyms):** collect
+  what everyday tasks newcomers actually look for (forum questions, "how do
+  I … in Linux" searches, beginner guides, AskUbuntu/Reddit titles) and
+  which words they use for each ("get rid of", "uninstall", "delete",
+  "kill", "close", "unzip", "extract", "free up space", …). Map each to
+  slash's verbs and check the fit is extremely good: the words people use
+  must lead to the right verb or a helpful hint, never to a wrong action
+  (e.g. "delete firefox" must not uninstall anything, "kill" stays the
+  core tool). Result: a table of use case → user words → slash phrase, and
+  a list of gaps to fix or new verbs to consider (goal 6: few names).
 - v1.x verbs: `open`, `download`, `connect to wifi`/`disconnect wifi`,
   `check internet`.
 - Typo correction (Damerau-Levenshtein, confirm first).

@@ -52,10 +52,26 @@ func (a *app) stop(p grammar.Phrase) int {
 	code := 0
 	for _, name := range p.Things {
 		name = strings.TrimSuffix(name, ".service")
-		prog, isProg := probe.FindProgram(progs, name)
+		found := probe.FindPrograms(progs, name)
+		isProg := len(found) > 0
+		var prog probe.Program
+		if isProg {
+			prog = found[0]
+		}
 		scope, isUnit := "", false
 		if sys.Systemd {
 			scope, isUnit = a.services.Unit(name)
+		}
+		if scope == "both" {
+			answer := a.ask(fmt.Sprintf("%s is a system service and a user service. Stop the [s]ystem one or the [u]ser one? ", name))
+			switch {
+			case strings.HasPrefix(answer, "s"):
+				scope = "system"
+			case strings.HasPrefix(answer, "u"):
+				scope = "user"
+			default:
+				continue
+			}
 		}
 		active := isUnit && a.services.Active(scope, name)
 		if isProg && active {
@@ -67,6 +83,19 @@ func (a *app) stop(p grammar.Phrase) int {
 				active = false
 			default:
 				continue
+			}
+		}
+		if isProg && len(found) > 1 {
+			// Several programs share the name: say which, stop all only if asked.
+			fmt.Fprintf(a.stderr, "%d programs called %s are running:\n", len(found), name)
+			for _, f := range found {
+				fmt.Fprintf(a.stderr, "  %s (process %s)\n", f.Name, pidList(f.PIDs))
+			}
+			if answer := a.ask(fmt.Sprintf("Stop all %d? [y/N] ", len(found))); answer != "y" && answer != "yes" {
+				continue
+			}
+			for _, f := range found[1:] {
+				prog.PIDs = append(prog.PIDs, f.PIDs...)
 			}
 		}
 		switch {
@@ -150,8 +179,16 @@ func (a *app) listRunning(verb string) int {
 	sys := sources.Detect(a.env)
 	if verb == grammar.Stop {
 		var names []string
+		count := map[string]int{}
 		for _, p := range a.services.Programs() {
-			names = append(names, p.Name)
+			if count[p.Name]++; count[p.Name] == 1 {
+				names = append(names, p.Name)
+			}
+		}
+		for i, n := range names {
+			if count[n] > 1 {
+				names[i] = fmt.Sprintf("%s (%d)", n, count[n])
+			}
 		}
 		a.printList("Programs", names)
 	}

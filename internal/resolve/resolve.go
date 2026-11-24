@@ -20,6 +20,9 @@ type Probe interface {
 	Available(source, pkg string) (name string, ok bool)
 	// Installed reports whether pkg is installed from source, and its name there.
 	Installed(source, pkg string) (name string, ok bool)
+	// Choices lists what pkg could mean in source when several packages
+	// match it equally well (installed ones only, or all available).
+	Choices(source, pkg string, installed bool) []string
 }
 
 // Result is a resolved command.
@@ -199,9 +202,11 @@ func (r *Resolver) install(p grammar.Phrase) (Result, error) {
 		}
 		names := make([]string, len(p.Things))
 		for i, pkg := range p.Things {
-			names[i] = pkg
+			names[i] = pkg // not found: the user named the source, let it answer
 			if n, ok := r.Probe.Available(src, pkg); ok {
 				names[i] = n
+			} else if err := r.ambiguous(src, pkg, false, p.Verb); err != nil {
+				return Result{}, err
 			}
 		}
 		c, err := r.expand(src, "install", names)
@@ -219,19 +224,26 @@ func (r *Resolver) install(p grammar.Phrase) (Result, error) {
 			g.add(def, n)
 			continue
 		}
-		found := false
+		if err := r.ambiguous(def, pkg, false, p.Verb); err != nil {
+			return Result{}, err
+		}
+		var found, names []string
 		for _, alt := range r.alternatives(def) {
 			if n, ok := r.Probe.Available(alt, pkg); ok {
-				g.add(alt, n)
-				reasons = append(reasons, fmt.Sprintf("%s: not in %s, found in %s", pkg, def, alt))
-				found = true
-				break
+				found, names = append(found, alt), append(names, n)
+			} else if err := r.ambiguous(alt, pkg, false, p.Verb); err != nil {
+				return Result{}, err
 			}
 		}
-		if !found {
-			// Let the package manager itself report it; its lists may be newer.
-			g.add(def, pkg)
+		if len(found) == 0 {
+			return Result{}, userErr("I found no package called %q in %s. Similar names: search %s", pkg, andList(r.present()), pkg)
 		}
+		g.add(found[0], names[0])
+		reason := fmt.Sprintf("%s: not in %s, found in %s", pkg, def, found[0])
+		if len(found) > 1 {
+			reason += fmt.Sprintf("; also in %s: install %s as %s", andList(found[1:]), pkg, found[1])
+		}
+		reasons = append(reasons, reason)
 	}
 	return r.build(p, "install", g, reasons)
 }
@@ -249,9 +261,11 @@ func (r *Resolver) remove(p grammar.Phrase) (Result, error) {
 		}
 		names := make([]string, len(p.Things))
 		for i, pkg := range p.Things {
-			names[i] = pkg
+			names[i] = pkg // not found: the user named the source, let it answer
 			if n, ok := r.Probe.Installed(src, pkg); ok {
 				names[i] = n
+			} else if err := r.ambiguous(src, pkg, true, p.Verb); err != nil {
+				return Result{}, err
 			}
 		}
 		c, err := r.expand(src, "remove", names)
@@ -269,16 +283,18 @@ func (r *Resolver) remove(p grammar.Phrase) (Result, error) {
 					name = n
 				}
 				where = append(where, src)
+			} else if err := r.ambiguous(src, pkg, true, p.Verb); err != nil {
+				return Result{}, err
 			}
 		}
 		switch len(where) {
 		case 0:
-			g.add(r.Sys.InstallDefault(), pkg) // let the package manager report it
+			return Result{}, userErr("%s isn't installed (I looked in %s). To find its exact name: search %s", pkg, andList(r.present()), pkg)
 		case 1:
 			g.add(where[0], name)
 		default:
 			g.add(where[0], name)
-			reasons = append(reasons, fmt.Sprintf("%s is also installed from %s", pkg, strings.Join(where[1:], ", ")))
+			reasons = append(reasons, fmt.Sprintf("%s is also installed from %s: remove %s from %s", pkg, andList(where[1:]), pkg, where[1]))
 		}
 	}
 	return r.build(p, "remove", g, reasons)
@@ -316,6 +332,24 @@ func (r *Resolver) own(p grammar.Phrase) (Result, error) {
 }
 
 // source maps a canonical source word to a source present on this system.
+// ambiguous returns an error asking which one when pkg matches several
+// packages in src equally well; slash never picks one of them itself.
+func (r *Resolver) ambiguous(src, pkg string, installed bool, verb string) error {
+	choices := r.Probe.Choices(src, pkg, installed)
+	if len(choices) < 2 {
+		return nil
+	}
+	return userErr("several %s apps are called %q: %s. Say which, e.g.: %s %s", src, pkg, strings.Join(choices, ", "), verb, choices[0])
+}
+
+// andList joins words as "a, b and c".
+func andList(words []string) string {
+	if len(words) < 2 {
+		return strings.Join(words, "")
+	}
+	return strings.Join(words[:len(words)-1], ", ") + " and " + words[len(words)-1]
+}
+
 func (r *Resolver) source(word string) (string, error) {
 	switch word {
 	case "system":

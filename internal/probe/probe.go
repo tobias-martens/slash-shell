@@ -116,23 +116,40 @@ func (p *Probe) Installed(source, pkg string) (string, bool) {
 		_, ok := p.Run("apk", "info", "--installed", pkg)
 		return pkg, ok
 	case "flatpak":
-		out, ok := p.Run("flatpak", "list", "--app", "--columns=application,name")
-		if !ok {
-			return "", false
-		}
-		var apps []App
-		for _, line := range strings.Split(out, "\n") {
-			id, name, _ := strings.Cut(line, "\t")
-			if id != "" {
-				apps = append(apps, App{ID: id, Name: name})
-			}
-		}
-		return match(apps, pkg)
+		return match(p.installedApps(), pkg)
 	case "snap":
 		_, ok := p.Run("snap", "list", "--", pkg)
 		return pkg, ok
 	}
 	return "", false
+}
+
+// Choices returns the names pkg could mean in source when it matches
+// several equally well (only flatpak: "firefox" may be a display name of
+// several apps), among installed packages or all available ones.
+func (p *Probe) Choices(source, pkg string, installed bool) []string {
+	if source != "flatpak" {
+		return nil
+	}
+	if installed {
+		return ids(matches(p.installedApps(), pkg))
+	}
+	return p.Flatpak.Choices(pkg)
+}
+
+func (p *Probe) installedApps() []App {
+	out, ok := p.Run("flatpak", "list", "--app", "--columns=application,name")
+	if !ok {
+		return nil
+	}
+	var apps []App
+	for _, line := range strings.Split(out, "\n") {
+		id, name, _ := strings.Cut(line, "\t")
+		if id != "" {
+			apps = append(apps, App{ID: id, Name: name})
+		}
+	}
+	return apps
 }
 
 func (p *Probe) snapNameExists(pkg string) bool {

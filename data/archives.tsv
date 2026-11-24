@@ -6,14 +6,27 @@
 #   pack needs     programs; - = can't pack this format
 #   pack           {archive} = new archive, {files} = what goes in; - = none
 # Templates must run in bash, zsh and fish alike.
+# Several rows for the same extensions are alternatives: slash uses the
+# first one whose programs are installed, so nobody has to install a tool
+# just to pack or unpack. Unpacking never overwrites files (tar/bsdtar -k;
+# unzip and 7z ask), so no alternative may overwrite silently.
 .tar.gz|.tgz	tar,gzip	tar -xkf {file}	tar -xkf {file} -C {dir}	tar,gzip	tar -czf {archive} {files}
 .tar.xz|.txz	tar,xz	tar -xkf {file}	tar -xkf {file} -C {dir}	tar,xz	tar -cJf {archive} {files}
+.tar.xz|.txz	bsdtar	bsdtar -xkf {file}	bsdtar -xkf {file} -C {dir}	bsdtar	bsdtar -a -cf {archive} {files}
 .tar.bz2|.tbz2|.tbz	tar,bzip2	tar -xkf {file}	tar -xkf {file} -C {dir}	tar,bzip2	tar -cjf {archive} {files}
+.tar.bz2|.tbz2|.tbz	bsdtar	bsdtar -xkf {file}	bsdtar -xkf {file} -C {dir}	bsdtar	bsdtar -a -cf {archive} {files}
 .tar.zst|.tzst	tar,zstd	tar -xkf {file}	tar -xkf {file} -C {dir}	tar,zstd	tar --zstd -cf {archive} {files}
+.tar.zst|.tzst	bsdtar	bsdtar -xkf {file}	bsdtar -xkf {file} -C {dir}	bsdtar	bsdtar -a -cf {archive} {files}
 .tar	tar	tar -xkf {file}	tar -xkf {file} -C {dir}	tar	tar -cf {archive} {files}
 .zip	unzip	unzip {file}	unzip {file} -d {dir}	zip	zip -r {archive} {files}
+.zip	7z	7z x {file}	7z x {file} -o{dir}	7z	7z a -tzip {archive} {files}
+.zip	bsdtar	bsdtar -xkf {file}	bsdtar -xkf {file} -C {dir}	bsdtar	bsdtar -a -cf {archive} {files}
+.zip	-	-	-	python3	python3 -m zipfile -c {archive} {files}
 .7z	7z	7z x {file}	7z x {file} -o{dir}	7z	7z a {archive} {files}
+.7z	bsdtar	bsdtar -xkf {file}	bsdtar -xkf {file} -C {dir}	bsdtar	bsdtar -a -cf {archive} {files}
 .rar	unrar	unrar x {file}	unrar x {file} {dir}/	-	-
+.rar	7z	7z x {file}	7z x {file} -o{dir}	-	-
+.rar	bsdtar	bsdtar -xkf {file}	bsdtar -xkf {file} -C {dir}	-	-
 .gz	gzip	gunzip -k {file}	-	-	-
 .xz	xz	unxz -k {file}	-	-	-
 .bz2	bzip2	bunzip2 -k {file}	-	-	-

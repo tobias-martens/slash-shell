@@ -2,6 +2,7 @@ package resolve
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -40,7 +41,7 @@ func TestFilesAndClean(t *testing.T) {
 		{ubuntu, []string{"unpack", "photos.zip", "and", "src.tar.gz"}, "unzip photos.zip && tar -xkf src.tar.gz", false, ""},
 		{ubuntu, []string{"unpack", "-odd.zip"}, "unzip ./-odd.zip", false, ""},
 		{ubuntu, []string{"unpack", "data.gz", "into", "x"}, "", false, "unpack next to themselves"},
-		{ubuntu, []string{"unpack", "big.7z"}, "", false, "needs 7z, which isn't installed"},
+		{ubuntu, []string{"unpack", "big.7z"}, "", false, "needs one of: 7z, bsdtar; none is installed"},
 		{ubuntu, []string{"unpack", "song.mp3"}, "", false, "don't know how to unpack"},
 		{ubuntu, []string{"unpack", "nope.zip"}, "", false, "no file called"},
 
@@ -93,24 +94,70 @@ func TestFilesAndClean(t *testing.T) {
 
 func TestNeverRm(t *testing.T) {
 	r := &Resolver{LookPath: func(string) (string, error) { return "", errors.New("no") }}
-	if cmd, err := r.trash([]string{"x"}); err == nil || strings.Contains(cmd, "rm") {
-		t.Errorf("without a trash tool slash must refuse, got %q %v", cmd, err)
+	if cmd, own := r.trash([]string{"x"}); !own || cmd != "slash delete x" {
+		t.Errorf("without a trash tool slash moves files itself, got %q %v", cmd, own)
 	}
 }
 
-// Without the zip program, pack says how to get it or use tar.gz; it never
-// switches formats on its own.
+// Nothing here makes zips: pack makes a tar.gz instead, never asking the
+// user to install anything.
 func TestPackWithoutZip(t *testing.T) {
 	archives, err := data.LoadArchives()
 	if err != nil {
 		t.Fatal(err)
 	}
 	r := &Resolver{Archives: archives,
-		Exists:   func(f string) bool { return f == "Photos" },
-		LookPath: func(n string) (string, error) { return "", errors.New("no") }}
+		Exists: func(f string) bool { return f == "Photos" },
+		LookPath: func(n string) (string, error) {
+			if n == "tar" || n == "gzip" {
+				return "/usr/bin/" + n, nil
+			}
+			return "", errors.New("no")
+		}}
 	p, _ := grammar.Parse([]string{"pack", "Photos"})
-	_, err = r.Resolve(p)
-	if err == nil || !strings.Contains(err.Error(), "install zip — or pack as tar.gz: pack Photos as tar.gz") {
+	if res, err := r.Resolve(p); err != nil || res.Command != "tar -czf Photos.tar.gz Photos" {
+		t.Errorf("got %q, %v", res.Command, err)
+	}
+	// Asked for a zip by name: that, or say what would make one.
+	p, _ = grammar.Parse([]string{"pack", "Photos", "as", "zip"})
+	if _, err := r.Resolve(p); err == nil || !strings.Contains(err.Error(), "needs one of: zip, 7z, bsdtar, python3") {
 		t.Errorf("got %v", err)
+	}
+}
+
+// With only some programs installed, slash uses the alternative that works.
+func TestAlternatives(t *testing.T) {
+	archives, _ := data.LoadArchives()
+	show, _ := data.LoadShow()
+	tests := []struct {
+		have []string
+		line []string
+		want string
+	}{
+		{[]string{"bsdtar"}, []string{"unpack", "photos.zip"}, "bsdtar -xkf photos.zip"},
+		{[]string{"7z", "bsdtar"}, []string{"unpack", "photos.zip", "into", "Old"}, "mkdir -p Old && 7z x photos.zip -oOld"},
+		{[]string{"bsdtar"}, []string{"pack", "Photos"}, "bsdtar -a -cf Photos.zip Photos"},
+		{[]string{"python3", "tar", "gzip"}, []string{"pack", "Photos"}, "python3 -m zipfile -c Photos.zip Photos"},
+		{[]string{"tar", "bsdtar"}, []string{"unpack", "src.tar.zst"}, "bsdtar -xkf src.tar.zst"},
+		{[]string{"netstat", "grep"}, []string{"show", "what", "uses", "port", "80"}, "netstat -tulpn | grep ':80 '"},
+		{[]string{"ss", "netstat"}, []string{"show", "ports"}, "ss -tulpn"},
+		{[]string{"wget"}, []string{"show", "public", "ip"}, "wget -qO- https://ifconfig.me; echo"},
+	}
+	for _, tt := range tests {
+		r := &Resolver{Archives: archives, Show: show,
+			Exists: func(f string) bool { return f == "Photos" || f == "photos.zip" || f == "src.tar.zst" },
+			LookPath: func(n string) (string, error) {
+				if slices.Contains(tt.have, n) {
+					return "/usr/bin/" + n, nil
+				}
+				return "", errors.New("no")
+			}}
+		p, err := grammar.Parse(tt.line)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res, err := r.Resolve(p); err != nil || res.Command != tt.want {
+			t.Errorf("%v with %v: got %q, %v; want %q", tt.line, tt.have, res.Command, err, tt.want)
+		}
 	}
 }

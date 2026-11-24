@@ -1,7 +1,9 @@
 package resolve
 
 import (
+	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -33,7 +35,9 @@ func ShowList(entries []data.ShowEntry) string {
 		case "service":
 			item += " <service>"
 		}
-		items = append(items, item)
+		if !slices.Contains(items, item) { // alternatives share a line
+			items = append(items, item)
+		}
 	}
 	return strings.Join(items, ", ")
 }
@@ -64,6 +68,29 @@ func (r *Resolver) show(p grammar.Phrase) (Result, error) {
 		}
 	}
 	what := entry.Phrases[0]
+	if entry.Target == "none" && len(rest) > 0 {
+		return Result{}, userErr("show %s works without anything after it", what)
+	}
+	// Rows for the same thing are alternatives: the first one whose
+	// programs are installed.
+	var options []string
+	found := false
+	for _, e := range r.Show {
+		if e.Phrases[0] != what {
+			continue
+		}
+		if r.LookPath == nil || r.has(e.Needs) {
+			entry, found = e, true
+			break
+		}
+		options = append(options, strings.Join(e.Needs, " and "))
+	}
+	if !found {
+		if len(options) == 1 {
+			return Result{}, userErr("show %s needs %s, which isn't installed", what, options[0])
+		}
+		return Result{}, userErr("show %s needs one of: %s; none is installed", what, strings.Join(options, ", "))
+	}
 	cmd := entry.Command
 	switch entry.Target {
 	case "none":
@@ -106,13 +133,9 @@ func (r *Resolver) show(p grammar.Phrase) (Result, error) {
 			unit = "--user-unit " + name
 		}
 		cmd = strings.ReplaceAll(cmd, "{unit}", unit)
-	}
-	for _, need := range entry.Needs {
-		if r.LookPath == nil {
-			break
-		}
-		if _, err := r.LookPath(need); err != nil {
-			return Result{}, userErr("show %s needs %s, which isn't installed", what, need)
+		if scope == "both" {
+			reason := fmt.Sprintf("%s is a system and a user service; the user one: journalctl --user-unit %s -e", name, name)
+			return Result{Command: cmd, Phrase: p, Confirm: true, Reason: reason}, nil
 		}
 	}
 	return Result{Command: cmd, Phrase: p, Confirm: entry.Internet != "", Reason: entry.Internet}, nil
@@ -145,7 +168,7 @@ func (r *Resolver) services(p grammar.Phrase) (Result, error) {
 	if !r.Sys.Systemd && p.Verb != grammar.Stop {
 		return Result{}, userErr("I only know systemd services so far, and this system doesn't use systemd")
 	}
-	var system, user []string
+	var system, user, both []string
 	for _, word := range p.Things {
 		name, err := r.serviceName(word)
 		if err != nil {
@@ -179,13 +202,22 @@ func (r *Resolver) services(p grammar.Phrase) (Result, error) {
 				return Result{}, userErr("the service %s isn't running", name)
 			}
 		}
-		if scope == "user" {
+		switch scope {
+		case "user":
 			user = append(user, name)
-		} else {
+		case "both": // the system one, confirmed first; the note names the other
+			system = append(system, name)
+			both = append(both, name)
+		default:
 			system = append(system, name)
 		}
 	}
-	return Result{Command: Systemctl(p.Verb, r.Root, system, user), Phrase: p}, nil
+	res := Result{Command: Systemctl(p.Verb, r.Root, system, user), Phrase: p}
+	if len(both) > 0 {
+		res.Confirm = true
+		res.Reason = fmt.Sprintf("%s is also a user service: systemctl --user %s %s", andList(both), p.Verb, strings.Join(both, " "))
+	}
+	return res, nil
 }
 
 // Systemctl returns the command that applies verb (start, stop, restart) to

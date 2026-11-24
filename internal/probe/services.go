@@ -36,14 +36,23 @@ func (s Services) scopes() []string {
 }
 
 // Unit implements resolve.Services.
+// The scope is "system", "user", or "both" when a system service and a
+// user service share the name (the caller must not pick one silently).
 func (s Services) Unit(name string) (string, bool) {
+	var found []string
 	for _, scope := range s.scopes() {
 		out, _ := s.systemctl(scope, "show", "--property=LoadState", "--value", "--", name+".service")
 		if strings.TrimSpace(out) == "loaded" {
-			return scope, true
+			found = append(found, scope)
 		}
 	}
-	return "", false
+	switch len(found) {
+	case 0:
+		return "", false
+	case 1:
+		return found[0], true
+	}
+	return "both", true
 }
 
 // Active implements resolve.Services.

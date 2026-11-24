@@ -139,7 +139,7 @@ func LoadArchives() ([]Archive, error) {
 		if len(f) != 6 {
 			return nil, fmt.Errorf("archives.tsv:%d: want 6 tab-separated columns", i+1)
 		}
-		out = append(out, Archive{Exts: strings.Split(f[0], "|"), UnpackNeeds: list(f[1]), Unpack: f[2],
+		out = append(out, Archive{Exts: strings.Split(f[0], "|"), UnpackNeeds: list(f[1]), Unpack: opt(f[2]),
 			UnpackInto: opt(f[3]), PackNeeds: list(f[4]), Pack: opt(f[5])})
 	}
 	return out, nil

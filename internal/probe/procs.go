@@ -271,21 +271,35 @@ func scopeName(scope string) string {
 	return strings.ToLower(id[strings.LastIndexByte(id, '.')+1:])
 }
 
-// FindProgram finds the program called name (case-insensitive).
+// FindProgram reports whether a program called name (case-insensitive)
+// is running.
 func FindProgram(progs []Program, name string) (Program, bool) {
+	found := FindPrograms(progs, name)
+	if len(found) == 0 {
+		return Program{}, false
+	}
+	return found[0], true
+}
+
+// FindPrograms returns every running program called name: by name first,
+// else by one of its other names. Several programs can share a name (e.g.
+// python run in two terminals); the caller must not pick one silently.
+func FindPrograms(progs []Program, name string) []Program {
+	var found []Program
 	for _, p := range progs {
 		if strings.EqualFold(p.Name, name) {
-			return p, true
+			found = append(found, p)
 		}
+	}
+	if len(found) > 0 {
+		return found
 	}
 	for _, p := range progs {
-		for _, a := range p.Aliases {
-			if strings.EqualFold(a, name) {
-				return p, true
-			}
+		if slices.ContainsFunc(p.Aliases, func(a string) bool { return strings.EqualFold(a, name) }) {
+			found = append(found, p)
 		}
 	}
-	return Program{}, false
+	return found
 }
 
 func cmpOr(a, b string) string {

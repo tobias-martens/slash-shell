@@ -17,6 +17,7 @@ import (
 type catalog interface {
 	Available(source, pkg string) (string, bool)
 	Installed(source, pkg string) (string, bool)
+	Choices(source, pkg string, installed bool) []string
 	Search(source string, words []string, limit int) ([]probe.Match, int, string, error)
 	About(source, pkg string) (probe.Info, bool)
 }
@@ -36,6 +37,8 @@ func (a *app) lookup(p grammar.Phrase) int {
 		return a.about(p)
 	case grammar.Stop, grammar.Restart:
 		return a.stop(p)
+	case grammar.Delete:
+		return a.trash(p.Things)
 	}
 	return exitNotHandled
 }
@@ -206,13 +209,25 @@ func (a *app) about(p grammar.Phrase) int {
 				hits = append(hits, infos[i])
 			}
 		}
-		if len(hits) == 0 {
+		// A name several apps share: list them, never pick one.
+		var several []string
+		for _, src := range srcs {
+			if ch := a.probe.Choices(src, pkg, false); len(ch) > 1 {
+				several = append(several, fmt.Sprintf("Several %s apps are called %q: %s. For one of them: about %s", src, pkg, strings.Join(ch, ", "), ch[0]))
+			}
+		}
+		if len(hits) == 0 && len(several) == 0 {
 			fmt.Fprintf(a.stdout, "No package called %q here (looked in %s). Similar names: search %s\n",
 				pkg, joinAnd(srcs), pkg)
 			code = 1
 			continue
 		}
-		a.printAbout(pkg, hits, how)
+		if len(hits) > 0 {
+			a.printAbout(pkg, hits, how)
+		}
+		for _, s := range several {
+			fmt.Fprintln(a.stdout, s)
+		}
 	}
 	return code
 }

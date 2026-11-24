@@ -124,7 +124,22 @@ offline() {
     cd /tmp && rm -rf packtest && mkdir -p packtest/Photos && echo hi >packtest/Photos/a.txt && cd packtest
     check "pack and unpack (zip)" sh -c "$SLASH pack Photos && $SLASH unpack Photos.zip into Zipped && test -f Zipped/Photos/a.txt"
     check "pack and unpack (tar.gz)" sh -c "$SLASH pack Photos as tar.gz && $SLASH unpack Photos.tar.gz into Copy && test -f Copy/Photos/a.txt"
+    # Fallbacks: with only python3 (or bsdtar) slash still makes a zip. The
+    # command is chosen with a PATH holding just that program, then run.
+    mkdir -p /tmp/only && ln -sf "$(command -v python3)" /tmp/only/python3
+    check "pack with only python3: a zip" sh -c "eval \"\$(PATH=/tmp/only $SLASH resolve --line 'pack Photos as Py.zip')\" && unzip -l Py.zip | grep -q Photos/a.txt"
+    if command -v bsdtar >/dev/null; then
+        rm -f /tmp/only/* && ln -sf "$(command -v bsdtar)" /tmp/only/bsdtar
+        check "pack and unpack with only bsdtar" sh -c "eval \"\$(PATH=/tmp/only $SLASH resolve --line 'pack Photos as Bsd.zip')\" && unzip -l Bsd.zip | grep -q Photos/a.txt && eval \"\$(PATH=/tmp/only $SLASH resolve --line 'unpack Bsd.zip into B')\" && test -f B/Photos/a.txt"
+    fi
+    mkdir -p /tmp/targz && ln -sf "$(command -v tar)" /tmp/targz/tar && ln -sf "$(command -v gzip)" /tmp/targz/gzip
+    expect "pack with nothing for zip: a tar.gz" "tar -czf Copy.tar.gz Copy" env PATH=/tmp/targz $SLASH resolve --line 'pack Copy'
     check "unpack keeps existing files" sh -c "echo mine >Photos/a.txt; ! $SLASH unpack Photos.tar.gz && grep -q mine Photos/a.txt"
+    # delete: into the home trash (/tmp may be another drive). With gio or
+    # trash-put that tool does it, else slash itself; same place either way.
+    echo x >"/root/old notes.txt"
+    { command -v gio || command -v trash-put; } >/dev/null || pass "(no gio or trash-put: slash's own trash)"
+    check "delete: to the trash" sh -c "cd /root && $SLASH delete 'old notes.txt' && test ! -e 'old notes.txt' && test -f '.local/share/Trash/files/old notes.txt' && grep -q '^Path=/root/old%20notes.txt$' '.local/share/Trash/info/old notes.txt.trashinfo'"
     cd /
 
     if [ -d /run/systemd/system ]; then

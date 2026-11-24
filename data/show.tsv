@@ -5,13 +5,19 @@
 #   command   {folder}, {port}, {unit} (journalctl -u NAME / --user-unit NAME)
 # Templates must run in bash, zsh and fish alike: no $(…), no [[ ]].
 # The internet is only used where the line says so in the 5th column.
+# Several rows for the same thing are alternatives: slash uses the first
+# one whose programs are installed.
 disk space|disk usage|free space	none	df	df -h -x tmpfs -x devtmpfs
 size of|size	folder	du	du -sh -- {folder}
 biggest files in|biggest files|largest files|big files	folder	du,sort,head	du -ah -- {folder} 2>/dev/null | sort -rh | head -n 20
 memory|ram	none	free	free -h
+memory|ram	none	grep	grep -E '^(MemTotal|MemAvailable|SwapTotal|SwapFree):' /proc/meminfo
 ip|ip address|ip addresses	none	ip	ip -br addr
+ip|ip address|ip addresses	none	ifconfig	ifconfig
 ports|open ports	none	ss	ss -tulpn
+ports|open ports	none	netstat	netstat -tulpn
 what uses port|what is using port	port	ss	ss -tulpn 'sport = :{port}'
+what uses port|what is using port	port	netstat,grep	netstat -tulpn | grep ':{port} '
 programs|processes|running programs	none	ps,head	ps -u "$USER" -o pid,%cpu,%mem,comm --sort=-%cpu | head -n 20
 services|running services	none	systemctl	systemctl list-units --type=service --state=running --no-pager; systemctl --user list-units --type=service --state=running --no-pager
 logs of|logs|log	service	journalctl	journalctl {unit} -e
@@ -19,5 +25,8 @@ errors	none	journalctl	journalctl -p err -b -e
 drives|disks	none	lsblk	lsblk -e 7 -o NAME,SIZE,TYPE,MOUNTPOINT,LABEL
 wifi|wifi networks|wlan	none	nmcli	nmcli dev wifi list
 battery	none	upower	upower -i /org/freedesktop/UPower/devices/DisplayDevice
+battery	none	grep	grep -H . /sys/class/power_supply/BAT*/capacity /sys/class/power_supply/BAT*/status
 system|system info	none	hostnamectl	hostnamectl
+system|system info	none	uname,grep	grep PRETTY_NAME /etc/os-release; uname -srm
 public ip	none	curl	curl -s https://ifconfig.me; echo	asks ifconfig.me over the internet
+public ip	none	wget	wget -qO- https://ifconfig.me; echo	asks ifconfig.me over the internet

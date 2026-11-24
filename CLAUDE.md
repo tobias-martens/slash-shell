@@ -25,10 +25,17 @@ under the same goals.
    flatpak or brew; skip when already root.
 5. **Predictable over clever.** A small, fixed grammar — not real NL parsing.
    When ambiguous, ask; never guess silently. Never add flags the user didn't
-   ask for (no `-y`).
+   ask for (no `-y`). Not found means saying so, never handing the name to
+   some tool anyway (no "let apt report it"). Several matches (flatpak apps
+   with one name, programs with one name, a system and a user service) →
+   name them and ask or confirm; never take the first.
 6. **Few reserved names.** Every bare word slash claims is a cost; add verbs
    and synonyms sparingly.
 7. **Reach.** Support all major distros and shells, not just one family.
+8. **Work with what is installed.** Never make the user install a tool just
+   to use a verb when something already present can do the job: data tables
+   list alternatives in order (`archives.tsv`, `show.tsv`: rows for the same
+   thing), and slash uses the first whose programs exist.
 
 ## Agreed design
 
@@ -104,10 +111,13 @@ under the same goals.
     (`mkdir -p D && …`); tar always with `-k` so existing files are never
     overwritten (unzip/7z/unrar ask themselves). `pack X [as zip|tar.xz|…|
     name.zip]`, default `.zip` (opens everywhere, also Windows/macOS; chosen
-    2026-11-24); without the zip program slash says "install zip — or pack
-    as tar.gz" instead of switching formats; several
+    2026-11-24) made with whatever is installed (zip, 7z, bsdtar, python3),
+    else `.tar.gz`; unpacking likewise (unzip, 7z, bsdtar; never an
+    alternative that overwrites silently); several
     things need a name; never overwrites an existing archive. `delete`:
-    `gio trash`, else `trash-put`, else refuse — never `rm`. `clean up
+    `gio trash`, else `trash-put`, else slash's own freedesktop trash
+    (`slash delete …`, home trash only; files on other drives are refused)
+    — never `rm`. `clean up
     [source]`: per-source `clean` key in `data/sources/*.tsv`; must keep
     package lists (offline search), so no `--all`/`-Scc`/metadata;
     snap and apk have none yet. `remove <file>` writes the trash command

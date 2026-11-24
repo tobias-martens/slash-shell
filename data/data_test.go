@@ -58,14 +58,22 @@ func TestShowTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A phrase may only repeat as a whole row of alternatives, right after
+	// the row it is an alternative for, with the same target.
 	seen := map[string]bool{}
+	var prev ShowEntry
 	for _, e := range entries {
+		alt := strings.Join(e.Phrases, "|") == strings.Join(prev.Phrases, "|")
+		if alt && (e.Target != prev.Target || (e.Internet == "") != (prev.Internet == "")) {
+			t.Errorf("%q: alternatives must have the same target and internet use", e.Phrases[0])
+		}
 		for _, p := range e.Phrases {
-			if seen[p] {
+			if seen[p] && !alt {
 				t.Errorf("phrase %q twice", p)
 			}
 			seen[p] = true
 		}
+		prev = e
 		// Must run in bash, zsh and fish alike.
 		for _, bad := range []string{"$(", "`", "[[", "<(", "${"} {
 			if strings.Contains(e.Command, bad) {
@@ -93,13 +101,16 @@ func TestArchives(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, a := range as {
-		if !strings.Contains(a.Unpack, "{file}") || (a.UnpackInto != "" && !strings.Contains(a.UnpackInto, "{dir}")) {
+		if a.Unpack == "" && a.Pack == "" {
+			t.Errorf("%v: a row that does nothing", a.Exts)
+		}
+		if (a.Unpack != "" && !strings.Contains(a.Unpack, "{file}")) || (a.UnpackInto != "" && !strings.Contains(a.UnpackInto, "{dir}")) {
 			t.Errorf("%v: bad unpack template", a.Exts)
 		}
 		if a.Pack != "" && (!strings.Contains(a.Pack, "{archive}") || !strings.Contains(a.Pack, "{files}")) {
 			t.Errorf("%v: bad pack template", a.Exts)
 		}
-		if strings.HasPrefix(a.Unpack, "tar ") && !strings.Contains(a.Unpack, "k") {
+		if (strings.HasPrefix(a.Unpack, "tar ") || strings.HasPrefix(a.Unpack, "bsdtar ")) && !strings.Contains(a.Unpack, "k") {
 			t.Errorf("%v: tar must keep existing files (-k)", a.Exts)
 		}
 		for _, bad := range []string{"$(", "`", "rm "} {

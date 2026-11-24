@@ -28,7 +28,7 @@ func TestShowAndServices(t *testing.T) {
 	installed := map[string]bool{"df": true, "du": true, "sort": true, "head": true, "journalctl": true,
 		"ss": true, "systemctl": true, "curl": true, "firefox": true}
 	svc := fakeServices{
-		units:    map[string]string{"ssh": "system", "cups": "system", "pipewire": "user", "docker": "system", "idle": "system"},
+		units:    map[string]string{"ssh": "system", "cups": "system", "pipewire": "user", "docker": "system", "idle": "system", "syncthing": "both"},
 		active:   map[string]bool{"ssh": true, "cups": true, "pipewire": true, "docker": true},
 		programs: map[string]bool{"firefox": true, "docker": true},
 	}
@@ -50,8 +50,10 @@ func TestShowAndServices(t *testing.T) {
 		{sys, "show logs of ssh", "journalctl -u ssh -e", false, ""},
 		{sys, "show logs for pipewire.service", "journalctl --user-unit pipewire -e", false, ""},
 		{sys, "show logs of nosuch", "", false, "no service called"},
+		{sys, "show logs of syncthing", "journalctl -u syncthing -e", true, ""},
+		{sys, "restart syncthing", "sudo systemctl restart syncthing", true, ""},
 		{sys, "show public ip", "curl -s https://ifconfig.me; echo", true, ""},
-		{sys, "show memory", "", false, "needs free"},
+		{sys, "show memory", "", false, "needs one of: free, grep"},
 		{sys, "show memory now", "", false, "works without anything"},
 		{sys, "show cats", "", false, "I can show: disk space, size of <folder>"},
 		{sys, "show", "", false, "show what?"},

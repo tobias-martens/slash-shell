@@ -32,16 +32,16 @@ comment. On Fedora the same word becomes `sudo dnf upgrade`, and on Arch
 | `update` | `sudo apt update && sudo apt upgrade; flatpak update; sudo snap refresh` |
 | `install vlc` | `sudo apt install vlc` |
 | `install firefox as flatpak` | `flatpak install org.mozilla.firefox` |
-| `remove vlc` | `sudo apt remove vlc` |
+| `remove spotify` | removes it wherever it came from, e.g. `sudo snap remove spotify` |
 | `search holiday` | finds files and packages, offline |
 | `about firefox` | details from every source: version, installed or not |
 | `show disk space` | `df -h -x tmpfs -x devtmpfs` |
 | `show what uses port 8080` | `ss -tulpn 'sport = :8080'` |
-| `restart bluetooth` | `sudo systemctl restart bluetooth` |
+| `restart nginx` | `sudo systemctl restart nginx` |
 | `stop firefox` | stops the program, and asks before forcing it |
 | `unpack photos.tar.zst into Old` | `mkdir -p Old && tar -xkf photos.tar.zst -C Old` |
-| `pack Photos` | `zip -r Photos.zip Photos` (or `pack Photos as tar.gz`) |
-| `delete old-notes.txt` | `gio trash old-notes.txt`: to the trash, never `rm` |
+| `pack Photos` | `zip -r Photos.zip Photos`, or a `.tar.gz` if nothing here makes zips |
+| `delete old-notes.txt` | `gio trash old-notes.txt`: to the trash, never `rm` (without gio, slash moves it there itself) |
 | `clean up` | `sudo apt autoremove && sudo apt clean; flatpak uninstall --unused` |
 | `slash` | a short intro with examples for your system |
 
@@ -57,10 +57,16 @@ packages but slash finds it elsewhere, it writes the command onto the line
 with the reason, and waits:
 
 ```
-$ flatpak install md.obsidian.Obsidian  #slash: install obsidian (obsidian: not in apt, found in flatpak)
+$ flatpak install md.obsidian.Obsidian  #slash: install obsidian (obsidian: not in apt, found in flatpak; also in snap: install obsidian as snap)
 ```
 
 Press Enter to run it, or Ctrl-C to cancel. You can also edit it first.
+
+**slash doesn't guess.** If no package has the name, it says so and
+suggests `search`, instead of handing the name to a package manager. If a
+name could mean several things (two flatpak apps called "Notes", two running
+programs called `python`, a system and a user service with one name), it
+names them and asks.
 
 **`search` and `about` never use the internet.** They read only the package
 lists already on your computer, so a search for a private file name never
