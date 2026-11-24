@@ -143,7 +143,10 @@ SHELLS = {
 def shell_env(home, bindir):
     return {"HOME": home, "PATH": bindir + ":/usr/bin:/bin", "TERM": "xterm", "LC_ALL": "C.UTF-8",
             "XDG_CONFIG_HOME": home + "/.config", "XDG_DATA_HOME": home + "/.local/share",
-            "XDG_STATE_HOME": home + "/state", "XDG_CACHE_HOME": home + "/cache"}
+            "XDG_STATE_HOME": home + "/state", "XDG_CACHE_HOME": home + "/cache",
+            # Debian/Ubuntu's /etc/zsh/zshrc runs compinit, which stops to ask
+            # where system folders look insecure (GitHub's runners).
+            "skip_global_compinit": "1"}
 
 
 class ShellCases:
@@ -318,9 +321,6 @@ class ZshTest(ShellCases, unittest.TestCase):
 
     def start(self, *a, **kw):
         os.environ.pop("ZDOTDIR", None)
-        # Debian/Ubuntu's /etc/zsh/zshrc runs compinit, which stops to ask
-        # where system folders look insecure (GitHub's runners).
-        os.environ["skip_global_compinit"] = "1"
         super().start(*a, **kw)
 
     def test_tab_completion(self):
