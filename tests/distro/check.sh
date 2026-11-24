@@ -59,10 +59,11 @@ prepare() {
 
 # answered COMMAND: runs it answering "y" to its questions. A fixed number
 # of answers: an endless `yes` into a terminal filled the container's
-# memory. zypper won't read answers from a pipe, so it gets a terminal.
+# memory. zypper won't read answers from a pipe, so it gets a terminal, and
+# it drops typed-ahead input before asking, so the answers come slowly.
 answered() {
     if [ $pm = zypper ]; then
-        printf 'y\ny\ny\ny\ny\n' | script -qec "$*" /dev/null
+        (for i in 1 2 3 4 5; do sleep 8; echo y; done) | script -qec "$*" /dev/null
     else
         printf 'y\ny\ny\ny\ny\n' | sh -c "$*"
     fi
