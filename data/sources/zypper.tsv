@@ -4,3 +4,4 @@ update	{sudo}zypper update
 update@opensuse-tumbleweed	{sudo}zypper dist-upgrade
 install	{sudo}zypper install {pkgs}
 remove	{sudo}zypper remove {pkgs}
+clean	{sudo}zypper clean

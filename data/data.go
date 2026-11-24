@@ -102,3 +102,45 @@ func LoadShow() ([]ShowEntry, error) {
 	}
 	return out, nil
 }
+
+//go:embed archives.tsv
+var archivesFile string
+
+// Archive is one archive format.
+type Archive struct {
+	Exts        []string // first is the one pack uses
+	UnpackNeeds []string
+	Unpack      string
+	UnpackInto  string // "" if it can't unpack into a folder
+	PackNeeds   []string
+	Pack        string // "" if slash can't create this format
+}
+
+// LoadArchives parses archives.tsv.
+func LoadArchives() ([]Archive, error) {
+	var out []Archive
+	list := func(s string) []string {
+		if s == "-" {
+			return nil
+		}
+		return strings.Split(s, ",")
+	}
+	opt := func(s string) string {
+		if s == "-" {
+			return ""
+		}
+		return s
+	}
+	for i, line := range strings.Split(archivesFile, "\n") {
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		f := strings.Split(line, "\t")
+		if len(f) != 6 {
+			return nil, fmt.Errorf("archives.tsv:%d: want 6 tab-separated columns", i+1)
+		}
+		out = append(out, Archive{Exts: strings.Split(f[0], "|"), UnpackNeeds: list(f[1]), Unpack: f[2],
+			UnpackInto: opt(f[3]), PackNeeds: list(f[4]), Pack: opt(f[5])})
+	}
+	return out, nil
+}

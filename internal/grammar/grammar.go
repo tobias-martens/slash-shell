@@ -20,6 +20,10 @@ const (
 	Start   = "start"
 	Stop    = "stop"
 	Restart = "restart"
+	Unpack  = "unpack"
+	Pack    = "pack"
+	Delete  = "delete"
+	Clean   = "clean"
 )
 
 // Verbs maps every accepted verb word (including synonyms) to its canonical verb.
@@ -31,6 +35,9 @@ var Verbs = map[string]string{
 	"about":  About, "describe": About,
 	"show":  Show,
 	"start": Start, "stop": Stop, "restart": Restart,
+	"unpack": Unpack, "pack": Pack,
+	"delete": Delete,
+	"clean":  Clean,
 }
 
 // Source words. "system" means whatever package manager the system uses.
@@ -59,6 +66,7 @@ type Phrase struct {
 	Source string   // canonical source, "" if none given
 	Text   string   // the phrase, normalised to single spaces
 	Words  []string // the words as given (for handing the phrase on to `slash`)
+	Target string   // unpack: folder ("into …"); pack: archive name or format ("as …")
 }
 
 // ErrNotAPhrase means the input isn't something slash handles at all; the
@@ -97,8 +105,41 @@ func Parse(words []string) (Phrase, error) {
 	p := Phrase{Verb: verb, Word: words[0], Text: joinPhrase(words), Words: given}
 	rest := words[1:]
 
-	if verb == Update {
+	switch verb {
+	case Update:
 		return parseUpdate(p, rest)
+	case Clean:
+		// "clean up", "clean up flatpak", "clean up only snap": like update.
+		if len(rest) > 0 && strings.EqualFold(rest[0], "up") {
+			rest = rest[1:]
+		}
+		q, err := parseUpdate(p, rest)
+		if err != nil {
+			return Phrase{}, fmt.Errorf("I can clean up everything (clean up) or one source (clean up flatpak)")
+		}
+		return q, nil
+	case Unpack, Pack:
+		// Optional trailing "into <folder>" (unpack) / "as <name or format>" (pack).
+		intro := map[string]bool{"into": true, "to": true}
+		if verb == Pack {
+			intro = map[string]bool{"as": true, "into": true, "to": true}
+		}
+		if n := len(rest); n >= 3 && intro[strings.ToLower(rest[n-2])] {
+			p.Target = rest[n-1]
+			rest = rest[:n-2]
+		}
+		fallthrough
+	case Delete:
+		things, err := parseList(rest)
+		if err != nil {
+			return Phrase{}, err
+		}
+		if len(things) == 0 {
+			return Phrase{}, fmt.Errorf("%s what? For example: %s", p.Word, map[string]string{
+				Unpack: "unpack photos.zip", Pack: "pack Photos as zip", Delete: "delete old-notes.txt"}[verb])
+		}
+		p.Things = things
+		return p, nil
 	}
 
 	switch verb {

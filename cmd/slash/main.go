@@ -42,6 +42,7 @@ type app struct {
 	files          fileFinder
 	services       serviceInfo
 	procs          processes
+	lstat          func(path string) bool       // nil: the real file system
 	ask            func(question string) string // asks the user (on the terminal)
 	state          takeover.State
 	root           bool
@@ -225,8 +226,12 @@ func (a *app) resolver() *resolve.Resolver {
 	if err != nil {
 		panic(err)
 	}
+	archives, err := data.LoadArchives()
+	if err != nil {
+		panic(err)
+	}
 	return &resolve.Resolver{Sys: sources.Detect(a.env), Root: a.root, Probe: a.probe, Templates: tmpl,
-		Show: show, Services: a.services, LookPath: a.env.LookPath}
+		Show: show, Services: a.services, LookPath: a.env.LookPath, Archives: archives, Exists: a.fileExists}
 }
 
 func (a *app) decider() takeover.Decider {
@@ -259,6 +264,16 @@ func runShell(command string) int {
 		return 127
 	}
 	return 0
+}
+
+// fileExists reports whether path exists, broken symlinks included (they
+// can still be deleted).
+func (a *app) fileExists(path string) bool {
+	if a.lstat != nil {
+		return a.lstat(path)
+	}
+	_, err := os.Lstat(path)
+	return err == nil
 }
 
 func homeDir() string {

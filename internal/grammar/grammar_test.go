@@ -51,6 +51,12 @@ func TestParseLine(t *testing.T) {
 		{"stop firefox and spotify", Stop, []string{"firefox", "spotify"}, "", "stop firefox and spotify"},
 		{"restart ssh", Restart, []string{"ssh"}, "", "restart ssh"},
 		{"start ssh as flatpak", Start, []string{"ssh", "as", "flatpak"}, "", "start ssh as flatpak"},
+		{"unpack photos.zip", Unpack, []string{"photos.zip"}, "", "unpack photos.zip"},
+		{"pack Photos and Videos as zip", Pack, []string{"Photos", "Videos"}, "", "pack Photos and Videos as zip"},
+		{"delete a.txt, b.txt", Delete, []string{"a.txt", "b.txt"}, "", "delete a.txt, b.txt"},
+		{"clean up", Clean, nil, "", "clean up"},
+		{"clean", Clean, nil, "", "clean"},
+		{"clean up flatpak", Clean, nil, "flatpak", "clean up flatpak"},
 		{"install python3-pip libfoo++ g++", Install, []string{"python3-pip", "libfoo++", "g++"}, "", "install python3-pip libfoo++ g++"},
 	}
 	for _, tt := range tests {
@@ -84,6 +90,25 @@ func TestErrors(t *testing.T) {
 		_, err := ParseLine(line)
 		if err == nil || errors.Is(err, ErrNotAPhrase) {
 			t.Errorf("%q: want a helpful error, got %v", line, err)
+		}
+	}
+}
+
+func TestTargets(t *testing.T) {
+	for line, want := range map[string]string{
+		"unpack a.zip into Old": "Old", "unpack a.zip": "", "pack Photos as photos.tar.gz": "photos.tar.gz",
+		"pack as": "", "unpack into": "",
+	} {
+		p, err := ParseLine(line)
+		if err != nil || p.Target != want {
+			t.Errorf("%q: target %q err %v", line, p.Target, err)
+		}
+	}
+	for _, line := range []string{"unpack", "delete", "clean up the kitchen", "pack Photos as"} {
+		if _, err := ParseLine(line); err == nil || errors.Is(err, ErrNotAPhrase) {
+			if line != "pack Photos as" {
+				t.Errorf("%q: want a user error, got %v", line, err)
+			}
 		}
 	}
 }

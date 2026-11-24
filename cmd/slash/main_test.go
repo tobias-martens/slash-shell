@@ -254,7 +254,7 @@ func TestDoctor(t *testing.T) {
 		"zsh   not enabled (turn on with: slash enable zsh)",
 		"install   slash's; /usr/bin/install still handles files",
 		"update    /usr/bin/update was installed after slash and wins; slash's: slash update …",
-		"about, describe, remove, restart, search, show, start, stop, uninstall, upgrade: slash's, no other program uses them",
+		"about, clean, delete, describe, pack, remove, restart, search, show, start, stop, uninstall, unpack, upgrade: slash's, no other program uses them",
 	} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("missing %q in:\n%s", want, out.String())

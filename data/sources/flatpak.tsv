@@ -3,3 +3,4 @@
 update	flatpak update
 install	flatpak install {pkgs}
 remove	flatpak uninstall {pkgs}
+clean	flatpak uninstall --unused

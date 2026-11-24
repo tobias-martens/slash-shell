@@ -100,6 +100,16 @@ under the same goals.
   - Cross-verb hints: `remove <existing file>` asks "that's a file — move it
     to the trash?"; `delete <x>` where x is no file but a package suggests
     `remove`.
+    Built (stage 4): formats in `data/archives.tsv`. `unpack X [into D]`
+    (`mkdir -p D && …`); tar always with `-k` so existing files are never
+    overwritten (unzip/7z/unrar ask themselves). `pack X [as zip|tar.xz|…|
+    name.zip]`, default `.tar.gz` (needs nothing extra everywhere); several
+    things need a name; never overwrites an existing archive. `delete`:
+    `gio trash`, else `trash-put`, else refuse — never `rm`. `clean up
+    [source]`: per-source `clean` key in `data/sources/*.tsv`; must keep
+    package lists (offline search), so no `--all`/`-Scc`/metadata;
+    snap and apk have none yet. `remove <file>` writes the trash command
+    onto the line for confirmation (reason in the comment).
 - `slash` (no arguments): short intro (one or two lines on what slash is)
   plus sample commands, adapted to the system (only verbs/sources that work
   here, e.g. no snap examples without snap). Ends with a hint that every real

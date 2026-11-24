@@ -2,3 +2,4 @@
 update	{sudo}apt update && {sudo}apt upgrade
 install	{sudo}apt install {pkgs}
 remove	{sudo}apt remove {pkgs}
+clean	{sudo}apt autoremove && {sudo}apt clean

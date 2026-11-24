@@ -1,0 +1,20 @@
+# Archive formats for unpack and pack. Columns (tab-separated):
+#   extensions     separated by |, first is the one pack uses
+#   unpack needs   programs, separated by ,
+#   unpack         {file} = the archive
+#   unpack into    {dir} = target folder (slash creates it first); - = not possible
+#   pack needs     programs; - = can't pack this format
+#   pack           {archive} = new archive, {files} = what goes in; - = none
+# Templates must run in bash, zsh and fish alike.
+.tar.gz|.tgz	tar,gzip	tar -xkf {file}	tar -xkf {file} -C {dir}	tar,gzip	tar -czf {archive} {files}
+.tar.xz|.txz	tar,xz	tar -xkf {file}	tar -xkf {file} -C {dir}	tar,xz	tar -cJf {archive} {files}
+.tar.bz2|.tbz2|.tbz	tar,bzip2	tar -xkf {file}	tar -xkf {file} -C {dir}	tar,bzip2	tar -cjf {archive} {files}
+.tar.zst|.tzst	tar,zstd	tar -xkf {file}	tar -xkf {file} -C {dir}	tar,zstd	tar --zstd -cf {archive} {files}
+.tar	tar	tar -xkf {file}	tar -xkf {file} -C {dir}	tar	tar -cf {archive} {files}
+.zip	unzip	unzip {file}	unzip {file} -d {dir}	zip	zip -r {archive} {files}
+.7z	7z	7z x {file}	7z x {file} -o{dir}	7z	7z a {archive} {files}
+.rar	unrar	unrar x {file}	unrar x {file} {dir}/	-	-
+.gz	gzip	gunzip -k {file}	-	-	-
+.xz	xz	unxz -k {file}	-	-	-
+.bz2	bzip2	bunzip2 -k {file}	-	-	-
+.zst	zstd	unzstd {file}	-	-	-

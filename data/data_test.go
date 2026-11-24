@@ -27,6 +27,13 @@ func TestLoadAllSources(t *testing.T) {
 
 func TestSafetyRules(t *testing.T) {
 	tm, _ := Load()
+	// Cleaning must keep package lists, or the offline search loses its data.
+	for src, m := range tm {
+		if c := m["clean"]; strings.Contains(c, "--all") || strings.Contains(c, "clean all") ||
+			strings.Contains(c, "-Scc") || strings.Contains(c, "metadata") {
+			t.Errorf("%s clean removes package lists: %q", src, c)
+		}
+	}
 	for key, tmpl := range tm["flatpak"] {
 		if strings.Contains(tmpl, "sudo") {
 			t.Errorf("flatpak %s uses sudo: %q", key, tmpl)
@@ -76,6 +83,29 @@ func TestShowTable(t *testing.T) {
 	for _, want := range []string{"disk space", "memory", "logs", "public ip"} {
 		if !seen[want] {
 			t.Errorf("missing %q", want)
+		}
+	}
+}
+
+func TestArchives(t *testing.T) {
+	as, err := LoadArchives()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range as {
+		if !strings.Contains(a.Unpack, "{file}") || (a.UnpackInto != "" && !strings.Contains(a.UnpackInto, "{dir}")) {
+			t.Errorf("%v: bad unpack template", a.Exts)
+		}
+		if a.Pack != "" && (!strings.Contains(a.Pack, "{archive}") || !strings.Contains(a.Pack, "{files}")) {
+			t.Errorf("%v: bad pack template", a.Exts)
+		}
+		if strings.HasPrefix(a.Unpack, "tar ") && !strings.Contains(a.Unpack, "k") {
+			t.Errorf("%v: tar must keep existing files (-k)", a.Exts)
+		}
+		for _, bad := range []string{"$(", "`", "rm "} {
+			if strings.Contains(a.Unpack+a.UnpackInto+a.Pack, bad) {
+				t.Errorf("%v: %q", a.Exts, bad)
+			}
 		}
 	}
 }

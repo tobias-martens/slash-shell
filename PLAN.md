@@ -59,9 +59,12 @@ always have the same version.
   OpenRC (Alpine) services, systems without per-app cgroups (falls back to
   a plain process list), sudo for programs of other users.
 
-## Stage 4 — files and cleanup
+## Stage 4 — files and cleanup (done 2026-11-24)
 - `unpack`/`pack` (tool by extension), `delete` (trash), `clean up`.
 - Cross-verb hints (`remove <file>`, `delete <package>`).
+- Status: built and unit-tested; tried for real on Ubuntu (tar, zip, gio).
+  7z/unrar/zstd and trash-put untested here. Cleaning snap (old revisions)
+  and apk not supported yet.
 
 ## Stage 5 — v1 release
 - Full CI matrix green, README examples verified, install docs.

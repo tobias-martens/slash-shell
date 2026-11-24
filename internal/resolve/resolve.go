@@ -117,6 +117,8 @@ type Resolver struct {
 	Show      []data.ShowEntry
 	Services  Services
 	LookPath  func(string) (string, error)
+	Archives  []data.Archive
+	Exists    func(path string) bool // relative to the current folder
 }
 
 // UserError is a problem the user should be told about in plain words.
@@ -141,6 +143,14 @@ func (r *Resolver) Resolve(p grammar.Phrase) (Result, error) {
 		return r.show(p)
 	case grammar.Start, grammar.Stop, grammar.Restart:
 		return r.services(p)
+	case grammar.Clean:
+		return r.clean(p)
+	case grammar.Unpack:
+		return r.unpack(p)
+	case grammar.Pack:
+		return r.pack(p)
+	case grammar.Delete:
+		return r.delete(p)
 	}
 	return Result{}, userErr("I don't know how to %s yet", p.Word)
 }
@@ -227,6 +237,11 @@ func (r *Resolver) install(p grammar.Phrase) (Result, error) {
 }
 
 func (r *Resolver) remove(p grammar.Phrase) (Result, error) {
+	if p.Source == "" {
+		if res, isFile, err := r.removeFiles(p); isFile {
+			return res, err
+		}
+	}
 	if p.Source != "" {
 		src, err := r.source(p.Source)
 		if err != nil {
