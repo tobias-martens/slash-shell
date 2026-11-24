@@ -51,10 +51,13 @@ always have the same version.
   from their documented output formats, unverified until the distro
   container tests (stage 5).
 
-## Stage 3 — show, start, stop, restart
+## Stage 3 — show, start, stop, restart (done 2026-11-24)
 - `show` with its fixed list of things; unknown thing → "I can show: …".
 - Services vs programs, ask on ambiguity; graceful stop, ask before force.
 - Bare `stop`/`restart` lists candidates; tab completion in all three shells.
+- Status: built and tested on Ubuntu with systemd (55 pty tests). Not yet:
+  OpenRC (Alpine) services, systems without per-app cgroups (falls back to
+  a plain process list), sudo for programs of other users.
 
 ## Stage 4 — files and cleanup
 - `unpack`/`pack` (tool by extension), `delete` (trash), `clean up`.

@@ -77,6 +77,20 @@ under the same goals.
     Bare `stop` / `restart` (no name) list what can be stopped/restarted
     (running programs + services) instead of erroring. Tab completion for
     `stop`/`start`/`restart` offers running programs and service names.
+    Built (stage 3): `show` is a table in `data/show.tsv` (synonyms, target
+    kind, required programs, command; templates must work in bash, zsh and
+    fish alike); `show public ip` is the only internet use and waits for a
+    second Enter. Services: `systemctl show -p LoadState` per unit, system
+    first, then `--user`. Programs: the user's processes grouped by cgroup
+    scope: one program per app scope (snap/flatpak named after the
+    snap/app, e.g. chromium not chrome; crash helpers stopped along), each
+    command run in a terminal; never slash's own shell. Stopping a program
+    is slash's own job (`slash stop …`): `→ kill PIDS` (TERM), wait 5 s,
+    then ask before `kill -KILL`, else print the command to force it.
+    Services only → a plain `systemctl stop` line. A name that is both a
+    running service and a program → slash asks which. Completion: `slash
+    complete <verb>`; never replaces an existing completion, except zsh's
+    leftover `_initctl` for Upstart's start/stop.
   - `unpack <archive>`: picks the tool by extension (`tar -xf`, `unzip`,
     `7z x`, `unrar x`, …). `pack <dir> [as zip|tar.gz|…]`: `zip -r` /
     `tar -czf`. (`compress`/`extract` avoided: taken by ncompress/libextractor.)
