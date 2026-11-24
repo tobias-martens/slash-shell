@@ -114,6 +114,9 @@ type Resolver struct {
 	Root      bool
 	Probe     Probe
 	Templates data.Templates
+	Show      []data.ShowEntry
+	Services  Services
+	LookPath  func(string) (string, error)
 }
 
 // UserError is a problem the user should be told about in plain words.
@@ -134,6 +137,10 @@ func (r *Resolver) Resolve(p grammar.Phrase) (Result, error) {
 		return r.remove(p)
 	case grammar.Search, grammar.About:
 		return r.own(p)
+	case grammar.Show:
+		return r.show(p)
+	case grammar.Start, grammar.Stop, grammar.Restart:
+		return r.services(p)
 	}
 	return Result{}, userErr("I don't know how to %s yet", p.Word)
 }

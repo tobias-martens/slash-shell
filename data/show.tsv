@@ -1,0 +1,23 @@
+# Things `show` knows. Columns (tab-separated):
+#   phrases   synonyms, separated by |
+#   target    none | folder (default: current folder) | port | service
+#   needs     programs that must be installed, separated by , (- for none)
+#   command   {folder}, {port}, {unit} (journalctl -u NAME / --user-unit NAME)
+# Templates must run in bash, zsh and fish alike: no $(…), no [[ ]].
+# The internet is only used where the line says so in the 5th column.
+disk space|disk usage|free space	none	df	df -h -x tmpfs -x devtmpfs
+size of|size	folder	du	du -sh -- {folder}
+biggest files in|biggest files|largest files|big files	folder	du,sort,head	du -ah -- {folder} 2>/dev/null | sort -rh | head -n 20
+memory|ram	none	free	free -h
+ip|ip address|ip addresses	none	ip	ip -br addr
+ports|open ports	none	ss	ss -tulpn
+what uses port|what is using port	port	ss	ss -tulpn 'sport = :{port}'
+programs|processes|running programs	none	ps,head	ps -u "$USER" -o pid,%cpu,%mem,comm --sort=-%cpu | head -n 20
+services|running services	none	systemctl	systemctl list-units --type=service --state=running --no-pager; systemctl --user list-units --type=service --state=running --no-pager
+logs of|logs|log	service	journalctl	journalctl {unit} -e
+errors	none	journalctl	journalctl -p err -b -e
+drives|disks	none	lsblk	lsblk -e 7 -o NAME,SIZE,TYPE,MOUNTPOINT,LABEL
+wifi|wifi networks|wlan	none	nmcli	nmcli dev wifi list
+battery	none	upower	upower -i /org/freedesktop/UPower/devices/DisplayDevice
+system|system info	none	hostnamectl	hostnamectl
+public ip	none	curl	curl -s https://ifconfig.me; echo	asks ifconfig.me over the internet

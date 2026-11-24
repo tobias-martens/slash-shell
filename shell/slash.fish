@@ -117,4 +117,16 @@ for __slash_v in $__slash_verbs
 end
 set -e __slash_v
 
+# Tab completion: running programs and services for stop, services for
+# start/restart; only where nothing else completes these words already.
+function __slash_complete
+    command -q slash; and slash complete $argv[1] 2>/dev/null
+end
+for __slash_v in start stop restart
+    contains -- $__slash_v $__slash_verbs; or continue
+    test -z "$(complete -c $__slash_v)"; or continue
+    complete -c $__slash_v -f -a "(__slash_complete $__slash_v)"
+end
+set -e __slash_v
+
 end

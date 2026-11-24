@@ -126,4 +126,25 @@ __slash_run() {
     done
 }
 
+# Tab completion: running programs and services for stop, services for
+# start/restart. compinit usually runs after this file, so this waits for
+# the first prompt. Words with their own completion are left alone, except
+# zsh's leftover one for Upstart's start/stop (_initctl).
+__slash_complete() {
+    (( $+commands[slash] )) || return 1
+    local -a names
+    names=(${(f)"$(slash complete $words[1] 2>/dev/null)"})
+    compadd -a names
+}
+__slash_compdef() {
+    add-zsh-hook -d precmd __slash_compdef
+    (( $+functions[compdef] )) || return 0
+    local v
+    for v in start stop restart; do
+        [[ $__slash_verbs == *" $v "* ]] || continue
+        [[ -z $_comps[$v] || $_comps[$v] == _initctl ]] && compdef __slash_complete $v
+    done
+}
+add-zsh-hook precmd __slash_compdef
+
 fi

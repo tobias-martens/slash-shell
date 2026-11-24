@@ -44,6 +44,13 @@ func TestParseLine(t *testing.T) {
 		{"describe vlc and gimp", About, []string{"vlc", "gimp"}, "", "describe vlc and gimp"},
 		{"about firefox in snap", About, []string{"firefox"}, "snap", "about firefox in snap"},
 		{"install foo in files", Install, []string{"foo", "in", "files"}, "", "install foo in files"},
+		{"show disk space", Show, []string{"disk", "space"}, "", "show disk space"},
+		{"show size of Downloads", Show, []string{"size", "of", "Downloads"}, "", "show size of Downloads"},
+		{"show", Show, nil, "", "show"},
+		{"stop", Stop, nil, "", "stop"},
+		{"stop firefox and spotify", Stop, []string{"firefox", "spotify"}, "", "stop firefox and spotify"},
+		{"restart ssh", Restart, []string{"ssh"}, "", "restart ssh"},
+		{"start ssh as flatpak", Start, []string{"ssh", "as", "flatpak"}, "", "start ssh as flatpak"},
 		{"install python3-pip libfoo++ g++", Install, []string{"python3-pip", "libfoo++", "g++"}, "", "install python3-pip libfoo++ g++"},
 	}
 	for _, tt := range tests {

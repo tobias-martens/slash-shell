@@ -16,6 +16,10 @@ const (
 	Remove  = "remove"
 	Search  = "search"
 	About   = "about"
+	Show    = "show"
+	Start   = "start"
+	Stop    = "stop"
+	Restart = "restart"
 )
 
 // Verbs maps every accepted verb word (including synonyms) to its canonical verb.
@@ -25,6 +29,8 @@ var Verbs = map[string]string{
 	"remove":  Remove, "uninstall": Remove,
 	"search": Search,
 	"about":  About, "describe": About,
+	"show":  Show,
+	"start": Start, "stop": Stop, "restart": Restart,
 }
 
 // Source words. "system" means whatever package manager the system uses.
@@ -93,6 +99,28 @@ func Parse(words []string) (Phrase, error) {
 
 	if verb == Update {
 		return parseUpdate(p, rest)
+	}
+
+	switch verb {
+	case Show:
+		// "show <thing> [of|in|for <target>]": the resolver knows the things.
+		for _, w := range rest {
+			if w != "," {
+				p.Things = append(p.Things, w)
+			}
+		}
+		return p, nil
+	case Start, Stop, Restart:
+		// Services and programs; bare "stop"/"restart" lists what's running.
+		things, err := parseList(rest)
+		if err != nil {
+			return Phrase{}, err
+		}
+		if len(things) == 0 && verb == Start {
+			return Phrase{}, fmt.Errorf("start what? For example: start ssh")
+		}
+		p.Things = things
+		return p, nil
 	}
 
 	sourceOf := SourceOf

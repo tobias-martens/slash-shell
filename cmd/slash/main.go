@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/tobias-martens/slash-shell/data"
 	"github.com/tobias-martens/slash-shell/internal/grammar"
@@ -39,6 +40,9 @@ type app struct {
 	env            sources.Env
 	probe          catalog
 	files          fileFinder
+	services       serviceInfo
+	procs          processes
+	ask            func(question string) string // asks the user (on the terminal)
 	state          takeover.State
 	root           bool
 	home           string
@@ -49,17 +53,20 @@ type app struct {
 
 func main() {
 	a := &app{
-		stdout:  os.Stdout,
-		stderr:  os.Stderr,
-		env:     sources.RealEnv(),
-		probe:   probe.New(),
-		files:   probe.NewFiles(),
-		state:   takeover.DefaultState(),
-		root:    os.Geteuid() == 0,
-		home:    homeDir(),
-		getenv:  os.Getenv,
-		confirm: askTTY,
-		execute: runShell,
+		stdout:   os.Stdout,
+		stderr:   os.Stderr,
+		env:      sources.RealEnv(),
+		probe:    probe.New(),
+		files:    probe.NewFiles(),
+		services: probe.NewServices(probe.ExecRunner(2 * time.Second)),
+		procs:    realProcesses(),
+		ask:      askTTY,
+		state:    takeover.DefaultState(),
+		root:     os.Geteuid() == 0,
+		home:     homeDir(),
+		getenv:   os.Getenv,
+		confirm:  func(q string) bool { a := askTTY(q); return a == "y" || a == "yes" },
+		execute:  runShell,
 	}
 	os.Exit(a.run(os.Args[1:]))
 }
@@ -84,6 +91,8 @@ func (a *app) run(args []string) int {
 		return a.disable()
 	case "doctor":
 		return a.doctor()
+	case "complete":
+		return a.complete(args[1:])
 	case "init":
 		if len(args) != 2 {
 			fmt.Fprintf(a.stderr, "usage: slash init %s\n", strings.Join(shell.Supported, "|"))
@@ -212,23 +221,29 @@ func (a *app) resolver() *resolve.Resolver {
 	if err != nil {
 		panic(err) // embedded data is checked by tests
 	}
-	return &resolve.Resolver{Sys: sources.Detect(a.env), Root: a.root, Probe: a.probe, Templates: tmpl}
+	show, err := data.LoadShow()
+	if err != nil {
+		panic(err)
+	}
+	return &resolve.Resolver{Sys: sources.Detect(a.env), Root: a.root, Probe: a.probe, Templates: tmpl,
+		Show: show, Services: a.services, LookPath: a.env.LookPath}
 }
 
 func (a *app) decider() takeover.Decider {
 	return takeover.Decider{LookPath: a.env.LookPath, Exists: a.env.Exists, Recorded: a.state.Recorded()}
 }
 
-func askTTY(question string) bool {
+// askTTY asks on the terminal and returns the answer in lower case ("" if
+// there is no terminal).
+func askTTY(question string) string {
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err != nil {
-		return false
+		return ""
 	}
 	defer tty.Close()
 	fmt.Fprint(tty, question)
 	answer, _ := bufio.NewReader(tty).ReadString('\n')
-	answer = strings.ToLower(strings.TrimSpace(answer))
-	return answer == "y" || answer == "yes"
+	return strings.ToLower(strings.TrimSpace(answer))
 }
 
 func runShell(command string) int {

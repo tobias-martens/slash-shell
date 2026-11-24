@@ -3,9 +3,12 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/tobias-martens/slash-shell/internal/probe"
 	"github.com/tobias-martens/slash-shell/internal/takeover"
@@ -41,6 +44,32 @@ func (f fakeProbe) About(src, pkg string) (probe.Info, bool) {
 	return probe.Info{Source: src, How: []string{src + " lookup"}}, false
 }
 
+type fakeSvc struct{}
+
+func (fakeSvc) Unit(n string) (string, bool) {
+	switch n {
+	case "ssh", "cups", "docker":
+		return "system", true
+	case "pipewire":
+		return "user", true
+	}
+	return "", false
+}
+func (fakeSvc) Active(_, n string) bool { return n != "cups" }
+func (fakeSvc) Program(n string) bool   { _, ok := probe.FindProgram(fakeSvc{}.Programs(), n); return ok }
+func (fakeSvc) Programs() []probe.Program {
+	return []probe.Program{{Name: "firefox", PIDs: []int{20, 22}}, {Name: "stubborn", PIDs: []int{30}},
+		{Name: "docker", PIDs: []int{40}}}
+}
+func (fakeSvc) Running(scope string) []string {
+	if scope == "user" {
+		return []string{"pipewire"}
+	}
+	return []string{"docker", "ssh"}
+}
+func (fakeSvc) All(scope string) []string { return append(fakeSvc{}.Running(scope), "cups") }
+func (fakeSvc) Scopes() []string          { return []string{"system", "user"} }
+
 type fakeFiles struct{ home string }
 
 func (f fakeFiles) Find(words []string, limit int) ([]string, int, string) {
@@ -71,6 +100,9 @@ func newTestApp(t *testing.T, bins ...string) (*app, *bytes.Buffer, *bytes.Buffe
 		execute: func(c string) int { ran = append(ran, c); return 0 },
 	}
 	a.files = fakeFiles{a.home}
+	a.services = fakeSvc{}
+	a.ask = func(string) string { return "" }
+	a.env.Exists = func(p string) bool { return p == "/run/systemd/system" }
 	a.env.LookPath = func(n string) (string, error) {
 		if present[n] {
 			return "/usr/bin/" + n, nil
@@ -83,7 +115,6 @@ func newTestApp(t *testing.T, bins ...string) (*app, *bytes.Buffer, *bytes.Buffe
 		}
 		return nil, errors.New("no")
 	}
-	a.env.Exists = func(string) bool { return false }
 	return a, &out, &errOut, &ran
 }
 
@@ -223,7 +254,7 @@ func TestDoctor(t *testing.T) {
 		"zsh   not enabled (turn on with: slash enable zsh)",
 		"install   slash's; /usr/bin/install still handles files",
 		"update    /usr/bin/update was installed after slash and wins; slash's: slash update …",
-		"about, describe, remove, search, uninstall, upgrade: slash's, no other program uses them",
+		"about, describe, remove, restart, search, show, start, stop, uninstall, upgrade: slash's, no other program uses them",
 	} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("missing %q in:\n%s", want, out.String())
@@ -286,5 +317,112 @@ func TestResolveOwnVerbs(t *testing.T) {
 	a, out, _, _ := newTestApp(t)
 	if code := a.run([]string{"resolve", "--line", "search holiday photos"}); code != exitRun || out.String() != "slash search holiday photos\n" {
 		t.Errorf("exit %d: %q", code, out.String())
+	}
+}
+
+// fakeProcs: every process ends on TERM except 30 ("stubborn").
+type fakeProcs struct {
+	signals []string
+	gone    map[int]bool
+}
+
+func (f *fakeProcs) install(a *app) {
+	f.gone = map[int]bool{}
+	a.procs = processes{
+		kill: func(pid int, sig syscall.Signal) error {
+			f.signals = append(f.signals, fmt.Sprintf("%d:%d", pid, sig))
+			if pid != 30 || sig == syscall.SIGKILL {
+				f.gone[pid] = true
+			}
+			return nil
+		},
+		alive: func(pid int) bool { return !f.gone[pid] },
+		sleep: func(time.Duration) {},
+	}
+}
+
+func TestStop(t *testing.T) {
+	a, out, errOut, ran := newTestApp(t)
+	var f fakeProcs
+	f.install(a)
+
+	if code := a.run([]string{"stop", "firefox"}); code != 0 || !strings.Contains(errOut.String(), "→ kill 20 22") {
+		t.Fatalf("exit %d: %s", code, errOut.String())
+	}
+	if strings.Join(f.signals, " ") != "20:15 22:15" {
+		t.Errorf("signals %v", f.signals)
+	}
+
+	// Still running after TERM: asks; "no" leaves it running.
+	f.signals = nil
+	asked := ""
+	a.confirm = func(q string) bool { asked = q; return false }
+	if code := a.run([]string{"stop", "stubborn"}); code != 1 || asked != "stubborn is still running. Force it to stop? [y/N] " {
+		t.Errorf("exit %d, asked %q", code, asked)
+	}
+	a.confirm = func(string) bool { return true }
+	errOut.Reset()
+	a.run([]string{"stop", "stubborn"})
+	if !strings.Contains(errOut.String(), "→ kill -KILL 30") || f.signals[len(f.signals)-1] != "30:9" {
+		t.Errorf("force: %s %v", errOut.String(), f.signals)
+	}
+
+	// A service and a program with the same name: asks which.
+	*ran = nil
+	a.ask = func(string) string { return "s" }
+	a.run([]string{"stop", "docker"})
+	if len(*ran) != 1 || (*ran)[0] != "sudo systemctl stop docker" {
+		t.Errorf("ran %v", *ran)
+	}
+
+	// Services only: a plain systemctl command, through layer 1.
+	out.Reset()
+	if code := a.run([]string{"resolve", "--line", "stop ssh and pipewire"}); code != exitRun ||
+		out.String() != "sudo systemctl stop ssh; systemctl --user stop pipewire  #slash: stop ssh and pipewire\n" {
+		t.Errorf("exit %d: %q", code, out.String())
+	}
+	out.Reset()
+	a.run([]string{"resolve", "--line", "stop firefox"})
+	if out.String() != "slash stop firefox\n" {
+		t.Errorf("got %q", out.String())
+	}
+}
+
+func TestListAndComplete(t *testing.T) {
+	a, out, _, _ := newTestApp(t)
+	a.run([]string{"stop"})
+	want := "Programs:\n  firefox, stubborn, docker\nServices:\n  docker, ssh\nYour services:\n  pipewire\n\nStop one with: stop <name>\n"
+	if out.String() != want {
+		t.Errorf("got:\n%s", out.String())
+	}
+	out.Reset()
+	a.run([]string{"restart"})
+	if strings.Contains(out.String(), "firefox") || !strings.Contains(out.String(), "Restart one with: restart <name>") {
+		t.Errorf("restart lists services only:\n%s", out.String())
+	}
+	out.Reset()
+	a.run([]string{"complete", "stop"})
+	if out.String() != "docker\nfirefox\npipewire\nssh\nstubborn\n" {
+		t.Errorf("complete stop: %q", out.String())
+	}
+	out.Reset()
+	a.run([]string{"complete", "start"})
+	if !strings.Contains(out.String(), "cups\n") {
+		t.Errorf("complete start: %q", out.String())
+	}
+}
+
+func TestShow(t *testing.T) {
+	a, out, errOut, _ := newTestApp(t, "df", "curl")
+	if code := a.run([]string{"resolve", "--line", "show disk space"}); code != exitRun || out.String() != "df -h -x tmpfs -x devtmpfs  #slash: show disk space\n" {
+		t.Errorf("exit %d: %q", code, out.String())
+	}
+	out.Reset()
+	if code := a.run([]string{"resolve", "--line", "show public ip"}); code != exitConfirm ||
+		!strings.Contains(out.String(), "(asks ifconfig.me over the internet)") {
+		t.Errorf("public ip must ask first: exit %d %q", code, out.String())
+	}
+	if code := a.run([]string{"resolve", "--words", "show", "cats"}); code != exitUserError || !strings.Contains(errOut.String(), "I can show:") {
+		t.Errorf("exit %d: %s", code, errOut.String())
 	}
 }

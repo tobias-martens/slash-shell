@@ -110,4 +110,17 @@ for __slash_v in $__slash_verbs; do
 done
 unset __slash_v
 
+# Tab completion: running programs and services for stop, services for
+# start/restart. Only where nothing else completes these words already.
+__slash_complete() {
+    command -v slash >/dev/null 2>&1 || return 0
+    local IFS=$'\n'
+    COMPREPLY=($(compgen -W "$(slash complete "$1" 2>/dev/null)" -- "${COMP_WORDS[COMP_CWORD]}"))
+}
+for __slash_v in start stop restart; do
+    [[ $__slash_verbs == *" $__slash_v "* ]] || continue
+    complete -p -- "$__slash_v" >/dev/null 2>&1 || complete -F __slash_complete -- "$__slash_v"
+done
+unset __slash_v
+
 fi

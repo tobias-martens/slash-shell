@@ -23,6 +23,7 @@ SLASH_BIN = os.environ.get("SLASH_BIN", "")
 FAKE_SLASH = r"""#!/bin/sh
 # Fake `slash resolve` with fixed answers.
 if [ "$1" = search ]; then shift; echo "FOUND-$*"; exit 0; fi
+if [ "$1" = complete ]; then printf 'firefox\nssh\n'; exit 0; fi
 [ "$1" = resolve ] || exit 9
 mode=$2; shift 2
 entry=""
@@ -240,6 +241,11 @@ class ShellCases:
         if self.records_layer2():
             self.assertIn("slash search holiday && echo after", self.history())
 
+    def test_tab_completion(self):
+        self.start()
+        self.sh.send("stop fi\t")
+        self.sh.expect("stop firefox")
+
     def test_layer2_ignorespace_not_recorded(self):
         self.start(before=self.cfg["ignorespace"])
         self.run_line("echo first", "first\n")
@@ -313,6 +319,13 @@ class ZshTest(ShellCases, unittest.TestCase):
     def start(self, *a, **kw):
         os.environ.pop("ZDOTDIR", None)
         super().start(*a, **kw)
+
+    def test_tab_completion(self):
+        # zsh completes only with its completion system, loaded in .zshrc
+        # (here after slash, as in most setups).
+        self.start(after="autoload -Uz compinit; compinit -u -D")
+        self.sh.send("stop fi\t")
+        self.sh.expect("stop firefox")
 
     def test_comment_option_restored(self):
         """'#' is only a comment for slash's own line; the user's setting stays."""

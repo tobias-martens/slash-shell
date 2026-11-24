@@ -34,6 +34,8 @@ func (a *app) lookup(p grammar.Phrase) int {
 		return a.search(p)
 	case grammar.About:
 		return a.about(p)
+	case grammar.Stop, grammar.Restart:
+		return a.stop(p)
 	}
 	return exitNotHandled
 }

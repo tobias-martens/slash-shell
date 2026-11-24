@@ -29,6 +29,7 @@ type System struct {
 	Immutable bool   // read-only base system (SteamOS, Fedora Atomic, …)
 	Flatpak   bool
 	Snap      bool
+	Systemd   bool // services are managed by systemd
 	OSID      string
 	OSLike    []string
 }
@@ -99,6 +100,7 @@ func Detect(env Env) System {
 	s.Flatpak = has("flatpak")
 	s.Snap = has("snap")
 	s.Immutable = s.OSID == "steamos" || env.Exists("/run/ostree-booted")
+	s.Systemd = env.Exists("/run/systemd/system")
 	return s
 }
 

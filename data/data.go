@@ -62,3 +62,43 @@ func (t Templates) Lookup(source, key, osID string) (tmpl string, ok bool) {
 	tmpl, ok = m[key]
 	return tmpl, ok
 }
+
+//go:embed show.tsv
+var showFile string
+
+// ShowEntry is one thing `show` can show.
+type ShowEntry struct {
+	Phrases  []string // synonyms, first is the main one
+	Target   string   // none, folder, port, service
+	Needs    []string // programs that must be installed
+	Command  string
+	Internet string // if set: why this uses the internet (asks before running)
+}
+
+// LoadShow parses show.tsv.
+func LoadShow() ([]ShowEntry, error) {
+	var out []ShowEntry
+	for i, line := range strings.Split(showFile, "\n") {
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		f := strings.Split(line, "\t")
+		if len(f) < 4 || len(f) > 5 {
+			return nil, fmt.Errorf("show.tsv:%d: want 4 or 5 tab-separated columns", i+1)
+		}
+		e := ShowEntry{Phrases: strings.Split(f[0], "|"), Target: f[1], Command: f[3]}
+		if f[2] != "-" {
+			e.Needs = strings.Split(f[2], ",")
+		}
+		if len(f) == 5 {
+			e.Internet = f[4]
+		}
+		switch e.Target {
+		case "none", "folder", "port", "service":
+		default:
+			return nil, fmt.Errorf("show.tsv:%d: unknown target %q", i+1, e.Target)
+		}
+		out = append(out, e)
+	}
+	return out, nil
+}

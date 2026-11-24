@@ -45,3 +45,37 @@ func TestSafetyRules(t *testing.T) {
 		}
 	}
 }
+
+func TestShowTable(t *testing.T) {
+	entries, err := LoadShow()
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, e := range entries {
+		for _, p := range e.Phrases {
+			if seen[p] {
+				t.Errorf("phrase %q twice", p)
+			}
+			seen[p] = true
+		}
+		// Must run in bash, zsh and fish alike.
+		for _, bad := range []string{"$(", "`", "[[", "<(", "${"} {
+			if strings.Contains(e.Command, bad) {
+				t.Errorf("%q: %q doesn't work in every shell", e.Phrases[0], bad)
+			}
+		}
+		online := strings.Contains(e.Command, "http") || strings.Contains(e.Command, "curl") || strings.Contains(e.Command, "wget")
+		if online != (e.Internet != "") {
+			t.Errorf("%q: uses the internet without saying so (or says so wrongly)", e.Phrases[0])
+		}
+		if strings.Contains(e.Command, "sudo") || strings.Contains(e.Command, " -y") {
+			t.Errorf("%q: show never needs sudo or -y", e.Phrases[0])
+		}
+	}
+	for _, want := range []string{"disk space", "memory", "logs", "public ip"} {
+		if !seen[want] {
+			t.Errorf("missing %q", want)
+		}
+	}
+}
