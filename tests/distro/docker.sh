@@ -11,7 +11,7 @@ cd "$(dirname "$0")/../.."
 image=$1
 bin=$(realpath "$2")
 docker run --rm --cap-add=NET_ADMIN \
-    -v "$PWD/tests:/root/tests:ro" -v "$bin:/usr/local/bin/slash:ro" \
+    -v "$PWD/tests:/root/tests:ro" -v "$PWD/install.sh:/root/install.sh:ro" -v "$bin:/usr/local/bin/slash:ro" \
     "$image" sh -c '
         c=/root/tests/distro/check.sh
         sh $c prepare || exit 1

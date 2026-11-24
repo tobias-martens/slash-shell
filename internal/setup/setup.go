@@ -49,6 +49,28 @@ func TargetFor(shell, home string, getenv func(string) string) (Target, error) {
 	return Target{}, fmt.Errorf("I can't set up %q; supported: bash, zsh, fish", shell)
 }
 
+// WithPath returns t with a line in its block that adds dir to PATH (at
+// the end, so it never shadows other commands), for a slash binary in a
+// folder that isn't on PATH yet. The line checks first, so dir is never
+// added twice; disabling slash removes it with the rest of the block.
+func (t Target) WithPath(dir, home string) (Target, error) {
+	if strings.ContainsAny(dir, "'\"$\\`\n") {
+		return t, fmt.Errorf("can't add %s to PATH: unusual characters in its name", dir)
+	}
+	q := "'" + dir + "'"
+	if rel, ok := strings.CutPrefix(dir, home+"/"); ok && home != "" {
+		q = `"$HOME/` + rel + `"`
+	}
+	var line string
+	if t.Shell == "fish" {
+		line = "contains -- " + q + " $PATH; or set -gx PATH $PATH " + q + "\n"
+	} else {
+		line = `case ":$PATH:" in *:` + q + `:*) ;; *) PATH="$PATH:"` + q + " ;; esac\n"
+	}
+	t.Block = begin + line + strings.TrimPrefix(t.Block, begin)
+	return t, nil
+}
+
 // record is what slash remembers about one change, to undo it exactly.
 type record struct {
 	Path     string   `json:"path"`

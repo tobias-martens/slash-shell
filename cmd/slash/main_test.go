@@ -237,6 +237,36 @@ func TestEnableDisable(t *testing.T) {
 	}
 }
 
+// The install script puts slash in ~/.local/bin, which may not be on PATH
+// yet: enable adds it in slash's block, disable takes it away again.
+func TestEnableAddsPath(t *testing.T) {
+	a, out, _, _ := newTestApp(t)
+	a.self = func() (string, error) { return a.home + "/.local/bin/slash", nil }
+	a.getenv = func(k string) string {
+		return map[string]string{"SHELL": "/bin/zsh", "PATH": "/usr/bin:/bin"}[k]
+	}
+	if code := a.run([]string{"enable"}); code != 0 {
+		t.Fatalf("enable: %d", code)
+	}
+	data, _ := os.ReadFile(a.home + "/.zshrc")
+	if !strings.Contains(string(data), `PATH="$PATH:""$HOME/.local/bin"`) || !strings.Contains(out.String(), "adds ~/.local/bin to PATH") {
+		t.Errorf("no PATH line:\n%s\n%s", data, out.String())
+	}
+	a.run([]string{"disable"})
+	if _, err := os.Stat(a.home + "/.zshrc"); !os.IsNotExist(err) {
+		t.Error(".zshrc should be gone again")
+	}
+
+	// Already on PATH: no PATH line.
+	a.getenv = func(k string) string {
+		return map[string]string{"SHELL": "/bin/zsh", "PATH": "/usr/bin:" + a.home + "/.local/bin"}[k]
+	}
+	a.run([]string{"enable"})
+	if data, _ := os.ReadFile(a.home + "/.zshrc"); strings.Contains(string(data), "PATH") {
+		t.Errorf("PATH line not needed:\n%s", data)
+	}
+}
+
 func TestDoctor(t *testing.T) {
 	a, out, _, _ := newTestApp(t, "update")
 	a.run([]string{"enable", "bash"})

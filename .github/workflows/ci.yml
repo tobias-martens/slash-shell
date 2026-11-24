@@ -17,6 +17,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y zsh fish
       - name: shell integration (real interactive shells in a pty)
         run: SLASH_BIN=$PWD/slash python3 -I tests/shell_test.py
+      - name: install script (install, use, uninstall: home folder unchanged)
+        run: SLASH_BIN=$PWD/slash sh tests/install_test.sh
 
   distros:
     # The real package managers, shells and offline lookups on each distro.

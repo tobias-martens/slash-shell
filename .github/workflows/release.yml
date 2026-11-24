@@ -1,0 +1,32 @@
+name: release
+# Push a tag like v1.0.0 to publish a release with the binaries that
+# install.sh downloads: slash-linux-<arch> and SHA256SUMS.
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test ./...
+      - name: build
+        run: |
+          v=${GITHUB_REF_NAME#v}
+          mkdir dist
+          for a in amd64 arm64 arm 386; do
+            CGO_ENABLED=0 GOOS=linux GOARCH=$a GOARM=7 \
+              go build -trimpath -ldflags "-s -w -X main.version=$v" -o dist/slash-linux-$a ./cmd/slash
+          done
+          (cd dist && sha256sum slash-linux-* > SHA256SUMS)
+      - name: check the installer against the built binary
+        run: SLASH_BIN=$PWD/dist/slash-linux-amd64 sh tests/install_test.sh
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "slash $GITHUB_REF_NAME" --generate-notes

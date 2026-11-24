@@ -50,6 +50,7 @@ type app struct {
 	getenv         func(string) string
 	confirm        func(question string) bool // asks the user (on the terminal)
 	execute        func(command string) int   // runs a command line
+	self           func() (string, error)     // path of the running slash binary
 }
 
 func main() {
@@ -68,6 +69,7 @@ func main() {
 		getenv:   os.Getenv,
 		confirm:  func(q string) bool { a := askTTY(q); return a == "y" || a == "yes" },
 		execute:  runShell,
+		self:     os.Executable,
 	}
 	os.Exit(a.run(os.Args[1:]))
 }
@@ -293,8 +295,12 @@ func (a *app) enable(shells []string) int {
 		shells = []string{sh}
 	}
 	store := setup.Store{Dir: a.state.Dir}
+	addPath := a.missingFromPath()
 	for _, sh := range shells {
 		t, err := setup.TargetFor(sh, a.home, a.getenv)
+		if err == nil && addPath != "" {
+			t, err = t.WithPath(addPath, a.home)
+		}
 		if err != nil {
 			fmt.Fprintf(a.stderr, "slash: %v\n", err)
 			return exitUserError
@@ -306,6 +312,9 @@ func (a *app) enable(shells []string) int {
 		}
 		if changed {
 			fmt.Fprintf(a.stdout, "slash is now enabled for %s (added to %s).\n", sh, tildePath(t.Path, a.home))
+			if addPath != "" {
+				fmt.Fprintf(a.stdout, "  It also adds %s to PATH there, so the slash command is found.\n", tildePath(addPath, a.home))
+			}
 		} else {
 			fmt.Fprintf(a.stdout, "slash was already enabled for %s.\n", sh)
 		}
@@ -334,6 +343,26 @@ func (a *app) enable(shells []string) int {
 	}
 	fmt.Fprintln(a.stdout, "\nOpen a new terminal to start. Undo everything with: slash disable")
 	return 0
+}
+
+// missingFromPath returns the folder of the running slash binary if that
+// folder isn't on PATH (e.g. ~/.local/bin, created by the install script
+// after login), else "".
+func (a *app) missingFromPath() string {
+	if a.self == nil {
+		return ""
+	}
+	exe, err := a.self()
+	if err != nil {
+		return ""
+	}
+	dir := filepath.Dir(exe)
+	for _, d := range filepath.SplitList(a.getenv("PATH")) {
+		if d == dir || (a.home != "" && strings.Replace(d, "~", a.home, 1) == dir) {
+			return ""
+		}
+	}
+	return dir
 }
 
 // disable undoes enable exactly and removes slash's state and cache.

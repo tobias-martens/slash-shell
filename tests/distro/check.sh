@@ -133,6 +133,8 @@ offline() {
         expect "start: needs systemd" "only know systemd" $SLASH start sshd
     fi
 
+    check "install script: install, use, uninstall" env SLASH_BIN=$SLASH sh /root/tests/install_test.sh
+
     if command -v python3 >/dev/null; then
         check "shell tests (bash, zsh, fish)" env SLASH_BIN=$SLASH python3 -I /root/tests/shell_test.py
     else

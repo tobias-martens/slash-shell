@@ -75,8 +75,16 @@ always have the same version.
   network off for search, about, files, show, pack/unpack, services and
   the bash/zsh/fish pty tests. This verifies the stage 2 parsers for dnf,
   pacman, zypper and apk. The Docker CI job runs the same checks
-  (untested until the repo is on GitHub). Still to do: install script with
-  full uninstall, README, release.
+  (untested until the repo is on GitHub).
+- Install script (`install.sh`, built 2026-11-24): per user, no sudo;
+  downloads `slash-linux-<arch>` + `SHA256SUMS` from the latest GitHub
+  release (`.github/workflows/release.yml` builds them on a `v*` tag),
+  installs to `~/.local/bin`, runs `slash enable`; `--uninstall` runs
+  `slash disable` and removes the binary and the folders the install
+  created. `tests/install_test.sh`: install twice, a new bash/zsh/fish finds
+  slash, uninstall, home folder byte-identical; passes locally and on all
+  six distros. The download path itself is untested until the first release.
+  Still to do: README pass (examples verified), release.
 
 ## After v1
 - v1.x verbs: `open`, `download`, `connect to wifi`/`disconnect wifi`,

@@ -43,6 +43,7 @@ for d in $distros; do
     done
     lxc file push "$bin" "$name/usr/local/bin/slash" --mode 0755 >>"$out" 2>&1
     lxc file push -r tests "$name/root/" >>"$out" 2>&1
+    lxc file push install.sh "$name/root/install.sh" >>"$out" 2>&1
 
     status=ok
     for phase in prepare online offline; do

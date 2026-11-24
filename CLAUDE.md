@@ -201,8 +201,12 @@ under the same goals.
     `~/.config/fish/conf.d/slash.fish`) and records the exact inserted text.
     `slash disable` removes exactly that text, slash's state dir
     (`~/.local/state/slash`) and cache (`~/.cache/slash`) — nothing else —
-    and says how to delete the binary. The install script (stage 5) will
-    offer full removal including the binary.
+    and says how to delete the binary. The install script (`install.sh`,
+    `--uninstall`) also removes the binary and the folders it created.
+  - Install script: per user into `~/.local/bin`, no sudo, checksum-checked
+    download. If the binary's folder isn't on PATH, `slash enable` puts a
+    line appending it to PATH inside slash's block (checked first, never
+    added twice), so disabling removes that too.
   - Since slash never touches other programs, any command it took over works
     as before immediately; already-open shells keep working thanks to
     fail-open. History entries stay valid, as they are real commands.

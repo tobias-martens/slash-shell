@@ -2,6 +2,7 @@ package setup
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -106,3 +107,42 @@ func TestZdotdir(t *testing.T) {
 }
 
 func ptr(s string) *string { return &s }
+
+// The PATH line must work in each shell: add the folder once, at the end.
+func TestWithPath(t *testing.T) {
+	home := t.TempDir()
+	for _, sh := range []string{"bash", "zsh", "fish"} {
+		bin, err := exec.LookPath(sh)
+		if err != nil {
+			t.Logf("%s not installed, skipped", sh)
+			continue
+		}
+		tg, _ := TargetFor(sh, home, env(nil))
+		tg, err = tg.WithPath(home+"/.local/bin", home)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(tg.Block, `"$HOME/.local/bin"`) || !strings.HasPrefix(tg.Block, begin) {
+			t.Fatalf("%s block:\n%s", sh, tg.Block)
+		}
+		line := strings.Split(tg.Block, "\n")[1]
+		script := line + "\n" + line + "\necho \"$PATH\"\n" // twice: added only once
+		if sh == "fish" {
+			script = line + "\n" + line + "\nstring join : $PATH\n"
+		}
+		noConfig := map[string]string{"bash": "--norc", "zsh": "-f", "fish": "--no-config"}[sh]
+		cmd := exec.Command(bin, noConfig, "-c", script)
+		cmd.Env = []string{"HOME=" + home, "PATH=/usr/bin:/bin"}
+		got, err := cmd.Output()
+		if want := "/usr/bin:/bin:" + home + "/.local/bin\n"; err != nil || string(got) != want {
+			t.Errorf("%s: got %q (err %v), want %q", sh, got, err, want)
+		}
+	}
+	tg, _ := TargetFor("bash", home, env(nil))
+	if tg, _ = tg.WithPath("/opt/slash bin", home); !strings.Contains(tg.Block, `*:'/opt/slash bin':*) ;; *) PATH="$PATH:"'/opt/slash bin' ;; esac`) {
+		t.Errorf("outside home:\n%s", tg.Block)
+	}
+	if _, err := tg.WithPath(`/opt/$x`, home); err == nil {
+		t.Error("a $ in the folder name must be refused")
+	}
+}

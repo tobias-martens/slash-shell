@@ -44,6 +44,25 @@ sudo apt update && sudo apt upgrade  #slash: update
 | `clean up` | free space from unneeded packages and caches |
 | `slash` | a short intro and examples for your system |
 
+## Install
+
+For your user only, no sudo:
+
+```
+curl -fsSL https://raw.githubusercontent.com/tobias-martens/slash-shell/main/install.sh | sh
+```
+
+This puts the `slash` program in `~/.local/bin` and adds one marked block to
+your shell's start-up file (`~/.bashrc`, `~/.zshrc` or fish's `conf.d`).
+Open a new terminal and type `slash` for a short intro. Using more than one
+shell? `slash enable zsh` (or `bash`, `fish`) turns it on there too.
+
+Remove it again, leaving every file exactly as it was:
+
+```
+curl -fsSL https://raw.githubusercontent.com/tobias-martens/slash-shell/main/install.sh | sh -s -- --uninstall
+```
+
 ## Principles
 
 - **Simple and natural.** Plain words, no special syntax to learn.
