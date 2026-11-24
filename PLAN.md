@@ -69,6 +69,14 @@ always have the same version.
 ## Stage 5 — v1 release
 - Full CI matrix green, README examples verified, install docs.
 - Create public GitHub repo `tobias-martens/slash-shell`, tag v1.0.
+- Status: distro tests pass in LXD (2026-11-24) on Debian 13, Ubuntu 24.04,
+  Fedora 43, Arch, openSUSE Tumbleweed and Alpine edge
+  (`tests/distro/lxd.sh`): real install/remove round trip, `clean up`, then
+  network off for search, about, files, show, pack/unpack, services and
+  the bash/zsh/fish pty tests. This verifies the stage 2 parsers for dnf,
+  pacman, zypper and apk. The Docker CI job runs the same checks
+  (untested until the repo is on GitHub). Still to do: install script with
+  full uninstall, README, release.
 
 ## After v1
 - v1.x verbs: `open`, `download`, `connect to wifi`/`disconnect wifi`,
