@@ -98,6 +98,11 @@ always have the same version.
   Still to do: create the public repo (needs the user's OK), first CI run,
   tag v1.0 (release workflow builds the binaries the installer downloads).
 
+- **Released 2026-11-24 as v1.0.0** (github.com/tobias-martens/slash-shell):
+  CI green, distro tests green on GitHub for all six (openSUSE included),
+  release binaries for amd64, arm64, arm, 386; installed with the real
+  `curl … | sh` on the author's Ubuntu.
+
 ## After v1
 - **Vocabulary study (thorough, before adding verbs or synonyms):** from
   public sources on the web only (AskUbuntu, Unix & Linux Stack Exchange,
