@@ -49,11 +49,11 @@ same() {
 
 prepare() {
     case $pm in
-        apt) apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y -q python3 zsh fish iproute2 procps ;;
-        dnf) dnf -y -q install python3 zsh fish iproute procps-ng findutils ;;
-        pacman) pacman -Syu --noconfirm --needed python zsh fish iproute2 procps-ng ;;
-        zypper) zypper -n -q refresh && zypper -n -q install python3 zsh fish iproute2 procps findutils util-linux ;;
-        apk) apk update -q && apk add -q python3 bash zsh fish iproute2 procps coreutils findutils ;;
+        apt) apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y -q python3 zsh fish iproute2 procps zip unzip ;;
+        dnf) dnf -y -q install python3 zsh fish iproute procps-ng findutils zip unzip ;;
+        pacman) pacman -Syu --noconfirm --needed python zsh fish iproute2 procps-ng zip unzip ;;
+        zypper) zypper -n -q refresh && zypper -n -q install python3 zsh fish iproute2 procps findutils util-linux zip unzip ;;
+        apk) apk update -q && apk add -q python3 bash zsh fish iproute2 procps coreutils findutils zip unzip ;;
     esac
 }
 
@@ -122,7 +122,8 @@ offline() {
     check "show memory runs" sh -c "eval \"\$($SLASH resolve --line 'show memory')\""
 
     cd /tmp && rm -rf packtest && mkdir -p packtest/Photos && echo hi >packtest/Photos/a.txt && cd packtest
-    check "pack and unpack" sh -c "$SLASH pack Photos && $SLASH unpack Photos.tar.gz into Copy && test -f Copy/Photos/a.txt"
+    check "pack and unpack (zip)" sh -c "$SLASH pack Photos && $SLASH unpack Photos.zip into Zipped && test -f Zipped/Photos/a.txt"
+    check "pack and unpack (tar.gz)" sh -c "$SLASH pack Photos as tar.gz && $SLASH unpack Photos.tar.gz into Copy && test -f Copy/Photos/a.txt"
     check "unpack keeps existing files" sh -c "echo mine >Photos/a.txt; ! $SLASH unpack Photos.tar.gz && grep -q mine Photos/a.txt"
     cd /
 

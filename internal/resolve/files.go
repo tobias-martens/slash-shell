@@ -8,9 +8,10 @@ import (
 	"github.com/tobias-martens/slash-shell/internal/grammar"
 )
 
-// packDefault is the format `pack` uses unless told otherwise: it needs
-// nothing beyond tar and gzip, which every Linux system has.
-const packDefault = ".tar.gz"
+// packDefault is the format `pack` uses unless told otherwise: zip opens
+// everywhere, also on Windows and macOS. Minimal installs may lack the zip
+// program; then slash says so instead of switching formats.
+const packDefault = ".zip"
 
 // clean removes unneeded packages and cached package files on every source
 // (or one), keeping each tool's own confirmation. Package lists are kept:
@@ -160,6 +161,9 @@ func (r *Resolver) pack(p grammar.Phrase) (Result, error) {
 		return Result{}, userErr("%s already exists; choose another name, e.g.: pack %s as new-%s", name, strings.Join(p.Things, " and "), name)
 	}
 	if err := r.needs(a.PackNeeds, "packing "+a.Exts[0]+" files"); err != nil {
+		if p.Target == "" {
+			return Result{}, userErr("pack makes .zip files, which needs zip. Install it with: install zip — or pack as tar.gz: %s as tar.gz", p.Text)
+		}
 		return Result{}, err
 	}
 	files := make([]string, len(p.Things))

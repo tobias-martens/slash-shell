@@ -103,7 +103,9 @@ under the same goals.
     Built (stage 4): formats in `data/archives.tsv`. `unpack X [into D]`
     (`mkdir -p D && …`); tar always with `-k` so existing files are never
     overwritten (unzip/7z/unrar ask themselves). `pack X [as zip|tar.xz|…|
-    name.zip]`, default `.tar.gz` (needs nothing extra everywhere); several
+    name.zip]`, default `.zip` (opens everywhere, also Windows/macOS; chosen
+    2026-11-24); without the zip program slash says "install zip — or pack
+    as tar.gz" instead of switching formats; several
     things need a name; never overwrites an existing archive. `delete`:
     `gio trash`, else `trash-put`, else refuse — never `rm`. `clean up
     [source]`: per-source `clean` key in `data/sources/*.tsv`; must keep

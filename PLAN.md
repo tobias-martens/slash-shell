@@ -84,7 +84,13 @@ always have the same version.
   created. `tests/install_test.sh`: install twice, a new bash/zsh/fish finds
   slash, uninstall, home folder byte-identical; passes locally and on all
   six distros. The download path itself is untested until the first release.
-  Still to do: README pass (examples verified), release.
+- README rewritten (2026-11-24): every example's command taken from real
+  `slash resolve` output on Ubuntu; describes line rewriting, asking,
+  offline search, takeover rules, install/uninstall, supported systems.
+- `pack` defaults to `.zip` (2026-11-24); without zip it says how to get it
+  or to use tar.gz.
+  Still to do: create the public repo (needs the user's OK), first CI run,
+  tag v1.0 (release workflow builds the binaries the installer downloads).
 
 ## After v1
 - v1.x verbs: `open`, `download`, `connect to wifi`/`disconnect wifi`,

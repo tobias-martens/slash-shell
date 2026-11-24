@@ -44,7 +44,8 @@ func TestFilesAndClean(t *testing.T) {
 		{ubuntu, []string{"unpack", "song.mp3"}, "", false, "don't know how to unpack"},
 		{ubuntu, []string{"unpack", "nope.zip"}, "", false, "no file called"},
 
-		{ubuntu, []string{"pack", "Videos"}, "tar -czf Videos.tar.gz Videos", false, ""},
+		{ubuntu, []string{"pack", "Videos"}, "zip -r Videos.zip Videos", false, ""},
+		{ubuntu, []string{"pack", "Videos", "as", "tar.gz"}, "tar -czf Videos.tar.gz Videos", false, ""},
 		{ubuntu, []string{"pack", "Photos", "as", "zip"}, "zip -r Photos.zip Photos", false, ""},
 		{ubuntu, []string{"pack", "Photos", "and", "Videos", "as", "media.zip"}, "zip -r media.zip Photos Videos", false, ""},
 		{ubuntu, []string{"pack", "Photos", "and", "Videos"}, "", false, "what should the archive be called"},
@@ -94,5 +95,22 @@ func TestNeverRm(t *testing.T) {
 	r := &Resolver{LookPath: func(string) (string, error) { return "", errors.New("no") }}
 	if cmd, err := r.trash([]string{"x"}); err == nil || strings.Contains(cmd, "rm") {
 		t.Errorf("without a trash tool slash must refuse, got %q %v", cmd, err)
+	}
+}
+
+// Without the zip program, pack says how to get it or use tar.gz; it never
+// switches formats on its own.
+func TestPackWithoutZip(t *testing.T) {
+	archives, err := data.LoadArchives()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &Resolver{Archives: archives,
+		Exists:   func(f string) bool { return f == "Photos" },
+		LookPath: func(n string) (string, error) { return "", errors.New("no") }}
+	p, _ := grammar.Parse([]string{"pack", "Photos"})
+	_, err = r.Resolve(p)
+	if err == nil || !strings.Contains(err.Error(), "install zip — or pack as tar.gz: pack Photos as tar.gz") {
+		t.Errorf("got %v", err)
 	}
 }
